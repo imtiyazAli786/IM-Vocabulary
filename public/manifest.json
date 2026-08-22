@@ -1,0 +1,17 @@
+{
+  "name": "Lafz — Vocabulary Revision",
+  "short_name": "Lafz",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fcfaf3",
+  "theme_color": "#fcfaf3",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+Vocabulary Learning App – Product Plan
+
+Objective:
+Build an app to help users remember and use 2000+ words using smart techniques.
+
+Core Features:
+1. Flashcards (word, meaning, sentence)
+2. Spaced repetition (show weak words more)
+3. Sentence builder (user creates sentences)
+4. Word status (new, learning, strong, mastered)
+5. Daily goals (20 words/day)
+
+Smart Features:
+1. Grouping (synonyms, antonyms, categories)
+2. Confusion words (affect vs effect)
+3. Story generator (5 words → story)
+4. Real-life usage prompts
+5. Voice/pronunciation check
+6. Revision-only mode
+
+Gamification:
+- Streaks
+- XP points
+- Levels (Beginner → Fluent)
+
+Learning Flow:
+Daily:
+- Learn words
+- Test
+- Use in sentence
+- Revise
+
+Weekly:
+- Learn (5 days)
+- Revise (1 day)
+- Test (1 day)
+
+Data Structure:
+Word:
+- word
+- meaning
+- sentence
+- group
+- status
+- lastReviewed
+- nextReview
+
+USP:
+“Not just remembering words — using them in real life”

@@ -1,0 +1,141 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-urdu: 'Noto Nastaliq Urdu', serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --shadow-card: 0 1px 2px 0 oklch(0.2 0.05 180 / 0.04), 0 8px 24px -8px oklch(0.2 0.05 180 / 0.12);
+  --shadow-elevated: 0 4px 12px -2px oklch(0.2 0.05 180 / 0.08), 0 16px 40px -12px oklch(0.2 0.05 180 / 0.18);
+}
+
+:root {
+  --radius: 0.875rem;
+  /* warm scholar cream */
+  --background: oklch(0.985 0.012 85);
+  --foreground: oklch(0.22 0.03 200);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.03 200);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.03 200);
+
+  /* deep teal */
+  --primary: oklch(0.42 0.08 200);
+  --primary-foreground: oklch(0.98 0.01 85);
+
+  --secondary: oklch(0.94 0.02 85);
+  --secondary-foreground: oklch(0.3 0.04 200);
+
+  --muted: oklch(0.95 0.015 85);
+  --muted-foreground: oklch(0.48 0.025 200);
+
+  /* terracotta accent */
+  --accent: oklch(0.68 0.14 40);
+  --accent-foreground: oklch(0.98 0.01 85);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0.01 85);
+  --success: oklch(0.62 0.13 155);
+  --success-foreground: oklch(0.98 0.01 85);
+  --warning: oklch(0.76 0.15 75);
+  --warning-foreground: oklch(0.22 0.03 200);
+
+  --border: oklch(0.9 0.02 85);
+  --input: oklch(0.9 0.02 85);
+  --ring: oklch(0.42 0.08 200);
+}
+
+.dark {
+  --background: oklch(0.18 0.025 200);
+  --foreground: oklch(0.96 0.015 85);
+  --card: oklch(0.24 0.03 200);
+  --card-foreground: oklch(0.96 0.015 85);
+  --popover: oklch(0.24 0.03 200);
+  --popover-foreground: oklch(0.96 0.015 85);
+  --primary: oklch(0.78 0.1 195);
+  --primary-foreground: oklch(0.18 0.025 200);
+  --secondary: oklch(0.28 0.03 200);
+  --secondary-foreground: oklch(0.96 0.015 85);
+  --muted: oklch(0.28 0.03 200);
+  --muted-foreground: oklch(0.7 0.025 200);
+  --accent: oklch(0.72 0.13 40);
+  --accent-foreground: oklch(0.18 0.025 200);
+  --destructive: oklch(0.68 0.2 27);
+  --destructive-foreground: oklch(0.98 0.01 85);
+  --success: oklch(0.7 0.13 155);
+  --success-foreground: oklch(0.18 0.025 200);
+  --warning: oklch(0.78 0.15 75);
+  --warning-foreground: oklch(0.18 0.025 200);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.78 0.1 195);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior-y: none;
+  }
+  /* Prevent iOS Safari zooming when focusing inputs (needs >=16px font) */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .font-urdu {
+    font-family: var(--font-urdu);
+    line-height: 2;
+    direction: rtl;
+  }
+}
