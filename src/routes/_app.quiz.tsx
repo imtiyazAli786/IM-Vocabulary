@@ -387,7 +387,7 @@ function QuizPage() {
                 <p className="text-3xl font-display font-semibold text-foreground">{q.word.word}</p>
               )}
               {q.type === "ur-to-en" && (
-                <p className="font-urdu text-3xl text-foreground text-right" dir="rtl">
+                <p className="font-urdu text-2xl sm:text-3xl text-foreground text-right leading-relaxed" dir="rtl">
                   {q.word.translation_ur}
                 </p>
               )}
@@ -417,7 +417,7 @@ function QuizPage() {
                         "border-border bg-card hover:border-primary/50",
                         isCorrect && "border-success bg-success/10 text-success",
                         isWrong && "border-destructive bg-destructive/10 text-destructive",
-                        q.type === "en-to-ur" && "font-urdu text-2xl text-right justify-end",
+                        q.type === "en-to-ur" && "font-urdu text-xl text-right justify-end",
                       )}
                     >
                       <span>{opt}</span>

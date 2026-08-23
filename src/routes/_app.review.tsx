@@ -460,7 +460,7 @@ function ReviewPage() {
               )}
 
               {current.translation_ur && (
-                <p className="font-urdu text-3xl text-foreground font-medium" dir="rtl">
+                <p className="font-urdu text-xl sm:text-2xl text-foreground font-medium leading-relaxed" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
