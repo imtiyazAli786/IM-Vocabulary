@@ -1,9 +1,8 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { LayoutDashboard, BookOpen, MessageSquareQuote, Layers, Trophy } from "lucide-react";
+import { BookOpen, MessageSquareQuote, Layers, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { to: "/", icon: LayoutDashboard, label: "Home" },
   { to: "/words", icon: BookOpen, label: "Words" },
   { to: "/sentences", icon: MessageSquareQuote, label: "Sentences" },
   { to: "/review", icon: Layers, label: "Review" },
@@ -27,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed bottom-0 inset-x-0 z-40 border-t border-border bg-card/95 backdrop-blur"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto max-w-xl grid grid-cols-5">
+        <div className="mx-auto max-w-xl grid grid-cols-4">
           {nav.map(({ to, icon: Icon, label }) => {
             const active = to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(to);
             return (
