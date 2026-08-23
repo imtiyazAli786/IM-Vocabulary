@@ -11,9 +11,11 @@ import {
   Layers,
   TrendingUp,
   ArrowRight,
-  AlertCircle,
   ChevronRight,
   User,
+  Plus,
+  MessageSquareQuote,
+  Zap,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { cn } from "@/lib/utils";
@@ -22,15 +24,6 @@ export const Route = createFileRoute("/_app/")({
   component: DashboardPage,
   head: () => ({ meta: [{ title: "Home — Lafz" }] }),
 });
-
-type WeakWord = {
-  id: string;
-  word: string;
-  repetitions: number;
-  ease: number;
-  translation_ur: string | null;
-  definition_en: string | null;
-};
 
 function StatBlock({
   icon: Icon,
@@ -59,7 +52,7 @@ function DashboardPage() {
     queryKey: ["dashboard"],
     queryFn: async () => {
       const now = new Date().toISOString();
-      const [profileRes, dueRes, masteredRes, totalRes, quizzesRes, weakRes] = await Promise.all([
+      const [profileRes, dueRes, masteredRes, totalRes, quizzesRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("current_streak,longest_streak,last_study_date")
@@ -72,12 +65,6 @@ function DashboardPage() {
           .select("score,total")
           .order("completed_at", { ascending: false })
           .limit(1),
-        supabase
-          .from("words")
-          .select("id,word,repetitions,ease,translation_ur,definition_en")
-          .not("mastered", "eq", true)
-          .order("repetitions", { ascending: true })
-          .limit(5),
       ]);
 
       const lastQuiz = quizzesRes.data?.[0];
@@ -91,9 +78,10 @@ function DashboardPage() {
         masteredCount: masteredRes.count ?? 0,
         totalCount: totalRes.count ?? 0,
         lastQuizPct: quizPct,
-        weakWords: (weakRes.data ?? []) as WeakWord[],
       };
     },
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
 
@@ -165,7 +153,7 @@ function DashboardPage() {
             <div>
               <p className="font-semibold">All caught up!</p>
               <p className="text-sm text-muted-foreground">
-                No words due. Take a quiz or add more.
+                No words due for review. Take a quiz or practice sentences.
               </p>
             </div>
           </div>
@@ -216,47 +204,55 @@ function DashboardPage() {
         )}
       </div>
 
-      {/* Weak words */}
-      {data && data.weakWords.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-              <AlertCircle className="w-3.5 h-3.5 text-warning" />
-              Needs practice
-            </p>
-            <button
-              className="text-xs text-primary font-medium flex items-center gap-0.5"
-              onClick={() => navigate({ to: "/words" })}
-            >
-              View all <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-          <div className="space-y-1.5">
-            {data.weakWords.map((w) => (
-              <button
-                key={w.id}
-                className="w-full text-left p-3 rounded-xl border border-border bg-card hover:border-primary/30 transition-colors active:scale-[0.99] cursor-pointer"
-                onClick={() => navigate({ to: "/words/$id", params: { id: w.id } })}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{w.word}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground tabular-nums">
-                        x{w.repetitions}
-                      </span>
-                    </div>
-                    <p className="font-urdu text-base text-muted-foreground mt-0.5" dir="rtl">
-                      {w.translation_ur ?? w.definition_en ?? ""}
-                    </p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 ml-2" />
-                </div>
-              </button>
-            ))}
-          </div>
+      {/* Quick Actions */}
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Quick Practice & Actions
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <button
+            onClick={() => navigate({ to: "/quiz" })}
+            className="flex items-center gap-3 p-3.5 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-muted/40 transition-all text-left shadow-card active:scale-[0.99] cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Zap className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm">Take a Quiz</p>
+              <p className="text-xs text-muted-foreground truncate">10 multiple choice questions</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+
+          <button
+            onClick={() => navigate({ to: "/sentences" })}
+            className="flex items-center gap-3 p-3.5 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-muted/40 transition-all text-left shadow-card active:scale-[0.99] cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <MessageSquareQuote className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm">Sentence Bank</p>
+              <p className="text-xs text-muted-foreground truncate">Read words in bilingual context</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
+
+          <button
+            onClick={() => navigate({ to: "/words/add" })}
+            className="flex items-center gap-3 p-3.5 rounded-xl border border-border bg-card hover:border-primary/40 hover:bg-muted/40 transition-all text-left shadow-card active:scale-[0.99] cursor-pointer"
+          >
+            <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Plus className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm">Add New Word</p>
+              <p className="text-xs text-muted-foreground truncate">With instant AI definitions</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
