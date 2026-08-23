@@ -26,54 +26,97 @@ Return ONLY valid JSON matching {"entries": [...]}. Infer missing fields when po
 export const parseVocabularyDocument = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url, model } = getAiConfig();
+    const { apiKey, url } = getAiConfig();
+    const fallbackModels = [
+      "gemini-2.5-flash-lite",
+      "gemini-3.6-flash",
+      "gemini-flash-latest",
+      "gemini-2.5-flash",
+    ];
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: `Extract vocabulary from this document text:\n\n${data.text.slice(0, 12000)}` },
-        ],
-        response_format: { type: "json_object" },
-      }),
-    });
+    let lastError: Error | null = null;
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`AI gateway error ${res.status}: ${errText.slice(0, 500)}`);
-      throw new Error("Failed to parse vocabulary. Please try again.");
+    for (const model of fallbackModels) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM },
+              { role: "user", content: `Extract vocabulary from this document text:\n\n${data.text.slice(0, 12000)}` },
+            ],
+            response_format: { type: "json_object" },
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.warn(`Model ${model} failed (${res.status}): ${errText.slice(0, 200)}`);
+          lastError = new Error(`AI model ${model} error: ${res.status}`);
+          continue; // Try next model
+        }
+
+        const j = await res.json();
+        let content = j.choices?.[0]?.message?.content ?? "{\"entries\":[]}";
+        content = content.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
+
+        const parsed = JSON.parse(content);
+        const list = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed.entries)
+          ? parsed.entries
+          : Array.isArray(parsed.words)
+          ? parsed.words
+          : Array.isArray(parsed.vocabulary)
+          ? parsed.vocabulary
+          : [];
+
+        if (list.length > 0) {
+          return { entries: list };
+        }
+      } catch (err) {
+        console.warn(`Error trying model ${model}:`, err);
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
-    const j = await res.json();
-    let content = j.choices?.[0]?.message?.content ?? "{\"entries\":[]}";
-    
-    // Clean up code fences if present
-    content = content.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
 
-    try {
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        return { entries: parsed };
+    // Fallback: If AI endpoints hit rate limits, extract plain word list line-by-line
+    const lines = data.text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("===") && !l.startsWith("#"));
+
+    if (lines.length > 0) {
+      const basicEntries = lines
+        .map((line) => {
+          const clean = line.replace(/^\d+[\.\)\-]\s*/, "").trim();
+          const parts = clean.split(/\s*[-–—:]\s*/);
+          const word = parts[0]?.trim();
+          const rest = parts.slice(1).join(" - ").trim();
+          const hasUrdu = /[\u0600-\u06FF]/.test(rest);
+
+          return {
+            word,
+            part_of_speech: "",
+            definition_en: !hasUrdu && rest ? rest : "",
+            translation_ur: hasUrdu ? rest : "",
+            example_en: "",
+            example_ur: "",
+          };
+        })
+        .filter((e) => e.word && e.word.length < 50);
+
+      if (basicEntries.length > 0) {
+        return { entries: basicEntries };
       }
-      if (Array.isArray(parsed.entries)) {
-        return { entries: parsed.entries };
-      }
-      if (Array.isArray(parsed.words)) {
-        return { entries: parsed.words };
-      }
-      if (Array.isArray(parsed.vocabulary)) {
-        return { entries: parsed.vocabulary };
-      }
-      return { entries: [] };
-    } catch (parseErr) {
-      console.error("JSON parse error on AI response:", parseErr, content.slice(0, 500));
-      return { entries: [] };
     }
+
+    throw lastError || new Error("Failed to parse vocabulary. Please try again in a moment.");
   });
 
 interface CSVRow {
