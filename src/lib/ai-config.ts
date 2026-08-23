@@ -9,13 +9,13 @@ export function getAiConfig() {
     throw new Error("AI service is unavailable. Please add GEMINI_API_KEY to enable AI features.");
   }
 
-  // Direct Google Gemini API uses "gemini-2.0-flash" (or "gemini-1.5-flash")
+  // Direct Google Gemini API uses "gemini-2.5-flash"
   // Lovable gateway uses "google/gemini-2.5-flash"
   const isGeminiDirect = !!(process.env.GEMINI_API_KEY || (globalThis as any).GEMINI_API_KEY);
   const url = isGeminiDirect
     ? "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
     : "https://ai.gateway.lovable.dev/v1/chat/completions";
-  const model = isGeminiDirect ? "gemini-2.0-flash" : "google/gemini-2.5-flash";
+  const model = isGeminiDirect ? "gemini-2.5-flash" : "google/gemini-2.5-flash";
 
   return { apiKey, url, model };
 }

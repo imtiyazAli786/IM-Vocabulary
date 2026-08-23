@@ -8,20 +8,20 @@ const Input = z.object({
   text: z.string().min(1).max(50000),
 });
 
-const SYSTEM = `You are a bilingual English-Urdu vocabulary extraction assistant for learners. Given raw text from a user's vocabulary document, extract every vocabulary word/entry you can find and return ONLY a compact JSON array of objects. Each object must have these keys (use empty string if missing):
+const SYSTEM = `You are a bilingual English-Urdu vocabulary extraction assistant for learners. Given raw text from a user's vocabulary document, extract every vocabulary word/entry you can find and return ONLY a JSON object in the exact format {"entries": [...]}. Each entry object in the array must have these keys (use empty string if missing):
 - word: the English word
 - part_of_speech: noun, verb, adjective, etc.
 - one_word_en: a SINGLE common English word with the same meaning (one word only)
-- one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word that a beginner or child would instantly understand (one word in Urdu script). MUST be common spoken Urdu — NOT literary, NOT Arabic/Persian-heavy, NOT formal. Prefer the most popular everyday word people actually use in conversation. Examples: "resilient" → "مضبوط" (not "مستحکم"); "concrete" → "ٹھوس"; "happy" → "خوش" (not "مسرور"); "big" → "بڑا" (not "عظیم"); "fast" → "تیز". If only a hard word exists, pick the simplest synonym even if slightly less precise.
+- one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word that a beginner or child would instantly understand (one word in Urdu script). MUST be common spoken Urdu — NOT literary, NOT Arabic/Persian-heavy, NOT formal. Examples: "resilient" → "مضبوط"; "concrete" → "ٹھوس"; "happy" → "خوش"; "big" → "بڑا"; "fast" → "تیز".
 - synonym: ONE common English synonym (single word)
 - antonym: ONE common English antonym (single word)
-- definition_en: a MERRIAM-WEBSTER STYLE English definition. Write it the way Merriam-Webster's dictionary would: concise, precise, lexicographic phrasing (often a noun phrase or infinitive, not a full sentence). Capture the core sense crisply. Example for "resilient": "able to recover readily from adversity, change, or misfortune."
-- translation_ur: a SIMPLE, everyday Urdu meaning in ONE short sentence (max 15 words). Use common Urdu words a beginner understands. Avoid difficult or literary language.
-- example_en: a natural example sentence in the style of Merriam-Webster's usage examples — realistic, idiomatic, dictionary-quality (max 18 words). Wrap the headword in quotes.
-- example_ur: the same example translated into SHORT, simple everyday Urdu (max 12 words). Use easy, conversational Urdu a beginner can understand.
+- definition_en: a MERRIAM-WEBSTER STYLE English definition. Concise, precise, lexicographic phrasing.
+- translation_ur: a SIMPLE, everyday Urdu meaning in ONE short sentence (max 15 words).
+- example_en: a natural example sentence in the style of Merriam-Webster usage examples. Wrap the headword in quotes.
+- example_ur: the same example translated into SHORT, simple everyday Urdu (max 12 words).
 - notes: any extra context or notes
 
-Return ONLY the JSON array. No markdown fences, no prose. Infer missing fields when possible. If the source has long/complex definitions, REWRITE them into the simple style above rather than copying verbatim.`;
+Return ONLY valid JSON matching {"entries": [...]}. Infer missing fields when possible.`;
 
 export const parseVocabularyDocument = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Input.parse(d))
@@ -45,30 +45,33 @@ export const parseVocabularyDocument = createServerFn({ method: "POST" })
     });
 
     if (!res.ok) {
-      const text = await res.text();
-      console.error(`AI gateway error ${res.status}: ${text.slice(0, 500)}`);
+      const errText = await res.text();
+      console.error(`AI gateway error ${res.status}: ${errText.slice(0, 500)}`);
       throw new Error("Failed to parse vocabulary. Please try again.");
     }
     const j = await res.json();
-    const content = j.choices?.[0]?.message?.content ?? "{\"entries\":[]}";
+    let content = j.choices?.[0]?.message?.content ?? "{\"entries\":[]}";
+    
+    // Clean up code fences if present
+    content = content.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```$/, "").trim();
+
     try {
-      const parsed = JSON.parse(content) as {
-        entries?: Array<{
-          word?: string;
-          part_of_speech?: string;
-          one_word_en?: string;
-          one_word_ur?: string;
-          synonym?: string;
-          antonym?: string;
-          definition_en?: string;
-          translation_ur?: string;
-          example_en?: string;
-          example_ur?: string;
-          notes?: string;
-        }>;
-      };
-      return { entries: parsed.entries ?? [] };
-    } catch {
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        return { entries: parsed };
+      }
+      if (Array.isArray(parsed.entries)) {
+        return { entries: parsed.entries };
+      }
+      if (Array.isArray(parsed.words)) {
+        return { entries: parsed.words };
+      }
+      if (Array.isArray(parsed.vocabulary)) {
+        return { entries: parsed.vocabulary };
+      }
+      return { entries: [] };
+    } catch (parseErr) {
+      console.error("JSON parse error on AI response:", parseErr, content.slice(0, 500));
       return { entries: [] };
     }
   });
