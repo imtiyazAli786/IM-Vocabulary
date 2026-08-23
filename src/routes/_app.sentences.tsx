@@ -64,7 +64,8 @@ function SentencesPage() {
       if (error) throw error;
       return data ?? [];
     },
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   // Extract all sentences

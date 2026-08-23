@@ -58,7 +58,10 @@ function WordsPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["words", q, tag, page],
     queryFn: async () => {
-      let query = supabase.from("words").select("*", { count: "exact", head: false });
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+
+      let query = supabase.from("words").select("*", { count: "exact" });
 
       if (tag?.trim()) {
         query = query.contains("tags", [tag.trim().toLowerCase()]);
@@ -71,13 +74,15 @@ function WordsPage() {
         );
       }
 
-      const offset = (page - 1) * PAGE_SIZE;
       const {
         data: rows,
         count,
         error,
-      } = await query.order("created_at", { ascending: false }).limit(PAGE_SIZE).offset(offset);
-      if (error) throw error;
+      } = await query.order("created_at", { ascending: false }).range(from, to);
+      if (error) {
+        console.error("Fetch words error:", error);
+        throw error;
+      }
       return { rows: rows ?? [], total: count ?? 0 };
     },
     staleTime: 0,

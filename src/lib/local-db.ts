@@ -96,6 +96,12 @@ class LocalQuery {
     return this;
   }
 
+  range(from: number, to: number) {
+    this.offsetN = from;
+    this.limitN = to - from + 1;
+    return this;
+  }
+
   limit(n: number) {
     this.limitN = n;
     return this;
