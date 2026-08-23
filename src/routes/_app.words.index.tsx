@@ -80,7 +80,8 @@ function WordsPage() {
       if (error) throw error;
       return { rows: rows ?? [], total: count ?? 0 };
     },
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
