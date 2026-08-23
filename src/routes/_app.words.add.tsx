@@ -328,21 +328,30 @@ function AddWordPage() {
           </div>
 
           <div>
-            <Label htmlFor="ur">Urdu translation</Label>
+            <Label htmlFor="ur">Urdu meaning (Simple & Easy — عام فہم اردو)</Label>
             <Textarea
               id="ur"
               rows={2}
+              placeholder="انتہائی آسان اور عام فہم اردو میں معنی..."
               value={form.translation_ur}
               onChange={update("translation_ur")}
               className="mt-1.5 font-urdu text-xl"
               dir="rtl"
             />
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Use common everyday words, not heavy or difficult literary words.
+            </p>
           </div>
 
           {/* Multiple Context Sentences */}
           <div className="space-y-3 pt-2 border-t border-border">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-semibold">Context Example Sentences</Label>
+              <div>
+                <Label className="text-sm font-semibold">Context Example Sentences</Label>
+                <p className="text-[11px] text-muted-foreground">
+                  With natural, easy-to-understand Urdu translations
+                </p>
+              </div>
               <Button
                 type="button"
                 variant="outline"
@@ -379,7 +388,7 @@ function AddWordPage() {
                   className="bg-card"
                 />
                 <Textarea
-                  placeholder="اردو ترجمہ..."
+                  placeholder="آسان اور عام فہم اردو ترجمہ..."
                   rows={2}
                   value={ex.ur}
                   onChange={(e) => updateExample(idx, "ur", e.target.value)}

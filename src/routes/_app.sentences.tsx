@@ -1,7 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { simplifySentencesBatch } from "@/lib/ai.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import {
   Search,
   Check,
   X,
+  RefreshCw,
 } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { speak } from "@/lib/speech";
@@ -61,6 +64,8 @@ function maskWord(sentence: string, word: string): string {
 
 function SentencesPage() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const simplifyBatch = useServerFn(simplifySentencesBatch);
 
   // View mode: 'cards' (immersive swipe player) or 'list' (browsing)
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
@@ -69,6 +74,10 @@ function SentencesPage() {
   const [selectedTag, setSelectedTag] = useState("");
   const [clozeMode, setClozeMode] = useState(false);
   const [showUrdu, setShowUrdu] = useState(true);
+
+  // State for AI simplification
+  const [isSimplifying, setIsSimplifying] = useState(false);
+  const [isBulkSimplifying, setIsBulkSimplifying] = useState(false);
 
   // Mastery state
   const [masteredMap, setMasteredMap] = useState<Record<string, boolean>>(() => {
@@ -225,6 +234,132 @@ function SentencesPage() {
     }
   }, [currentIndex, setCardIndex]);
 
+  // Helper to persist simple Urdu update to Supabase & localStorage
+  const updateWordSentenceUrdu = async (wordId: string, sentenceId: string, newUr: string) => {
+    try {
+      const { data: word } = await supabase.from("words").select("*").eq("id", wordId).single();
+      if (word) {
+        let updatedExamples = Array.isArray(word.examples) ? [...word.examples] : [];
+        let updatedExampleUr = word.example_ur;
+
+        if (sentenceId.includes("-ex-")) {
+          const parts = sentenceId.split("-ex-");
+          const exIdx = parseInt(parts[1], 10);
+          if (!isNaN(exIdx) && updatedExamples[exIdx]) {
+            updatedExamples[exIdx] = { ...updatedExamples[exIdx], ur: newUr };
+          }
+        } else {
+          updatedExampleUr = newUr;
+          if (updatedExamples.length > 0) {
+            updatedExamples[0] = { ...updatedExamples[0], ur: newUr };
+          }
+        }
+
+        await supabase
+          .from("words")
+          .update({
+            examples: updatedExamples,
+            example_ur: updatedExampleUr,
+          })
+          .eq("id", wordId);
+
+        // Local storage persistence
+        const raw = localStorage.getItem("lafz_local_data");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.words) {
+            const w = parsed.words.find((x: any) => x.id === wordId);
+            if (w) {
+              w.examples = updatedExamples;
+              w.example_ur = updatedExampleUr;
+              localStorage.setItem("lafz_local_data", JSON.stringify(parsed));
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update word sentence urdu:", err);
+    }
+  };
+
+  // Simplify single current sentence
+  const handleSimplifyCurrent = async () => {
+    const current = filtered[currentIndex];
+    if (!current || isSimplifying) return;
+    setIsSimplifying(true);
+    try {
+      const res = await simplifyBatch({
+        data: {
+          sentences: [
+            {
+              id: current.id,
+              word: current.word,
+              en: current.en,
+            },
+          ],
+        },
+      });
+      const newUr = res.translations?.[0]?.ur;
+      if (newUr) {
+        await updateWordSentenceUrdu(current.wordId, current.id, newUr);
+        qc.invalidateQueries({ queryKey: ["words-sentences"] });
+        qc.invalidateQueries({ queryKey: ["words"] });
+        toast.success("Sentence simplified to easy Urdu!");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Simplification failed");
+    } finally {
+      setIsSimplifying(false);
+    }
+  };
+
+  // Bulk simplify all sentences
+  const handleSimplifyAll = async () => {
+    if (isBulkSimplifying || allSentences.length === 0) return;
+    setIsBulkSimplifying(true);
+    toast.loading("Starting easy Urdu translation...", { id: "bulk-simplify" });
+    try {
+      const BATCH_SIZE = 8;
+      let totalUpdated = 0;
+      for (let i = 0; i < allSentences.length; i += BATCH_SIZE) {
+        const batch = allSentences.slice(i, i + BATCH_SIZE);
+        const res = await simplifyBatch({
+          data: {
+            sentences: batch.map((s) => ({
+              id: s.id,
+              word: s.word,
+              en: s.en,
+            })),
+          },
+        });
+        if (res.translations && res.translations.length > 0) {
+          for (const item of res.translations) {
+            const found = batch.find((b) => b.id === item.id);
+            if (found && item.ur) {
+              await updateWordSentenceUrdu(found.wordId, found.id, item.ur);
+              totalUpdated++;
+            }
+          }
+        }
+        toast.loading(
+          `Translating to easy Urdu: ${Math.min(i + BATCH_SIZE, allSentences.length)} of ${allSentences.length}...`,
+          { id: "bulk-simplify" },
+        );
+      }
+      qc.invalidateQueries({ queryKey: ["words-sentences"] });
+      qc.invalidateQueries({ queryKey: ["words"] });
+      toast.success(`Successfully converted ${totalUpdated} sentences into simple, easy Urdu!`, {
+        id: "bulk-simplify",
+      });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Bulk simplification error", {
+        id: "bulk-simplify",
+      });
+    } finally {
+      setIsBulkSimplifying(false);
+    }
+  };
+
   // Keyboard navigation for card player
   useEffect(() => {
     if (viewMode !== "cards") return;
@@ -302,26 +437,40 @@ function SentencesPage() {
           </p>
         </div>
 
-        {/* View mode toggle (Cards vs List) */}
-        <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border">
+        {/* View mode & Simplify All buttons */}
+        <div className="flex items-center gap-1.5">
           <Button
-            variant={viewMode === "cards" ? "default" : "ghost"}
+            variant="outline"
             size="sm"
-            onClick={() => setViewMode("cards")}
-            className="h-7 px-2.5 text-xs gap-1"
+            onClick={handleSimplifyAll}
+            disabled={isBulkSimplifying || allSentences.length === 0}
+            className="h-7 px-2 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10 transition-colors"
+            title="Convert all sentences in your vocabulary to simple everyday Urdu"
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Cards</span>
+            <Sparkles className={cn("w-3 h-3", isBulkSimplifying && "animate-spin")} />
+            <span>{isBulkSimplifying ? "Simplifying…" : "Simplify All Urdu"}</span>
           </Button>
-          <Button
-            variant={viewMode === "list" ? "default" : "ghost"}
-            size="sm"
-            onClick={() => setViewMode("list")}
-            className="h-7 px-2.5 text-xs gap-1"
-          >
-            <List className="w-3.5 h-3.5" />
-            <span>List</span>
-          </Button>
+
+          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border">
+            <Button
+              variant={viewMode === "cards" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("cards")}
+              className="h-7 px-2.5 text-xs gap-1"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Cards</span>
+            </Button>
+            <Button
+              variant={viewMode === "list" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("list")}
+              className="h-7 px-2.5 text-xs gap-1"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>List</span>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -490,12 +639,24 @@ function SentencesPage() {
                 </div>
               </div>
 
-              {/* Urdu Translation Card Section (Toggle / Reveal) */}
+              {/* Urdu Translation Card Section (Toggle / Reveal & Easy Urdu) */}
               <div className="pt-6 border-t border-border/60 mt-4 space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                    Urdu Meaning
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                      Urdu Meaning
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleSimplifyCurrent}
+                      disabled={isSimplifying}
+                      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium cursor-pointer"
+                      title="Translate this sentence into simple, everyday spoken Urdu"
+                    >
+                      <Sparkles className={cn("w-3 h-3", isSimplifying && "animate-spin")} />
+                      <span>{isSimplifying ? "Simplifying…" : "Easy Urdu"}</span>
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setShowUrdu((s) => !s)}
@@ -659,14 +820,41 @@ function SentencesPage() {
                       "{clozeMode ? maskWord(s.en, s.word) : s.en}"
                     </p>
 
-                    {s.ur && (
-                      <p
-                        className="font-urdu text-xl text-muted-foreground text-right pt-0.5"
-                        dir="rtl"
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const res = await simplifyBatch({
+                              data: {
+                                sentences: [{ id: s.id, word: s.word, en: s.en }],
+                              },
+                            });
+                            const newUr = res.translations?.[0]?.ur;
+                            if (newUr) {
+                              await updateWordSentenceUrdu(s.wordId, s.id, newUr);
+                              qc.invalidateQueries({ queryKey: ["words-sentences"] });
+                              qc.invalidateQueries({ queryKey: ["words"] });
+                              toast.success("Updated to easy Urdu!");
+                            }
+                          } catch (e) {
+                            toast.error(e instanceof Error ? e.message : "Simplification failed");
+                          }
+                        }}
+                        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium shrink-0"
                       >
-                        {s.ur}
-                      </p>
-                    )}
+                        <Sparkles className="w-3 h-3" /> Easy Urdu
+                      </button>
+
+                      {s.ur && (
+                        <p
+                          className="font-urdu text-xl text-muted-foreground text-right"
+                          dir="rtl"
+                        >
+                          {s.ur}
+                        </p>
+                      )}
+                    </div>
                   </Card>
                 );
               })}
