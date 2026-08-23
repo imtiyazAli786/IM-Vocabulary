@@ -196,10 +196,17 @@ function ImportPage() {
         return;
       }
 
+      const VALID_TYPES = new Set(["word", "phrase", "connector", "idiom", "tense_pattern"]);
+      const sanitizeType = (t?: string, word?: string): "word" | "phrase" | "connector" | "idiom" | "tense_pattern" => {
+        if (t && VALID_TYPES.has(t.toLowerCase())) return t.toLowerCase() as any;
+        if (word && word.trim().split(/\s+/).length > 1) return "phrase";
+        return "word";
+      };
+
       const rows = deduplicated.map((e) => ({
         user_id: userRes.user.id,
         word: e.word.trim(),
-        type: e.type || "word",
+        type: sanitizeType(e.type, e.word),
         part_of_speech: e.part_of_speech?.trim() || null,
         one_word_en: e.one_word_en?.trim() || null,
         one_word_ur: e.one_word_ur?.trim() || null,
@@ -209,24 +216,31 @@ function ImportPage() {
         translation_ur: e.translation_ur?.trim() || null,
         example_en: e.example_en?.trim() || null,
         example_ur: e.example_ur?.trim() || null,
+        examples: e.example_en?.trim() ? [{ en: e.example_en.trim(), ur: e.example_ur?.trim() || "" }] : [],
+        tags: [] as string[],
+        collocations: [] as string[],
         notes: e.notes?.trim() || null,
       }));
 
-      // Insert in batches of 200 to prevent timeouts/payload limit issues
-      const chunkSize = 200;
+      // Insert in batches of 100 to prevent timeouts/payload limit issues
+      const chunkSize = 100;
       let count = 0;
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
         const { error } = await supabase.from("words").insert(chunk);
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase insert error:", error);
+          throw new Error(error.message || "Failed to insert words into database.");
+        }
         count += chunk.length;
         setSavedCount(count);
       }
 
-      // CQ-5: targeted invalidations instead of qc.invalidateQueries() with no args
-      qc.invalidateQueries({ queryKey: ["words"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
-      qc.invalidateQueries({ queryKey: ["review-queue"] });
+      await qc.invalidateQueries({ queryKey: ["words"] });
+      await qc.invalidateQueries({ queryKey: ["dashboard"] });
+      await qc.invalidateQueries({ queryKey: ["review-queue"] });
+      await qc.invalidateQueries({ queryKey: ["user-tags"] });
+      await qc.refetchQueries({ queryKey: ["words"] });
 
       const msg =
         skippedCount > 0
