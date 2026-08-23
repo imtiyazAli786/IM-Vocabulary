@@ -668,7 +668,7 @@ function SentencesPage() {
 
                 {showUrdu ? (
                   <p
-                    className="font-urdu text-2xl sm:text-3xl text-foreground/90 text-right leading-loose pt-1"
+                    className="font-urdu text-xl sm:text-2xl text-foreground/90 text-right leading-relaxed pt-1"
                     dir="rtl"
                   >
                     {currentSentence.ur || "ترجمہ موجود نہیں"}
@@ -848,7 +848,7 @@ function SentencesPage() {
 
                       {s.ur && (
                         <p
-                          className="font-urdu text-xl text-muted-foreground text-right"
+                          className="font-urdu text-base sm:text-lg text-foreground/80 text-right leading-relaxed"
                           dir="rtl"
                         >
                           {s.ur}

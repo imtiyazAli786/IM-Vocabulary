@@ -294,11 +294,11 @@ function WordsPage() {
                         {/* Right Column: Urdu Meaning in Clean Nastaliq Typography */}
                         <div className="text-right shrink-0 max-w-[45%]">
                           {w.one_word_ur ? (
-                            <p className="font-urdu text-2xl font-bold text-primary leading-tight" dir="rtl">
+                            <p className="font-urdu text-lg sm:text-xl text-primary font-medium leading-normal" dir="rtl">
                               {w.one_word_ur}
                             </p>
                           ) : w.translation_ur ? (
-                            <p className="font-urdu text-xl font-medium text-primary/90 leading-tight truncate" dir="rtl">
+                            <p className="font-urdu text-base sm:text-lg text-primary/90 font-medium leading-normal truncate" dir="rtl">
                               {w.translation_ur}
                             </p>
                           ) : null}

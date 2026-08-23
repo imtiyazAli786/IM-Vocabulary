@@ -320,11 +320,11 @@ function WordDetailPage() {
 
               <div className="text-right shrink-0">
                 {w.one_word_ur ? (
-                  <p className="font-urdu text-3xl sm:text-4xl font-bold text-primary leading-tight" dir="rtl">
+                  <p className="font-urdu text-2xl sm:text-3xl font-semibold text-primary leading-normal" dir="rtl">
                     {w.one_word_ur}
                   </p>
                 ) : w.translation_ur ? (
-                  <p className="font-urdu text-2xl font-bold text-primary leading-tight" dir="rtl">
+                  <p className="font-urdu text-xl sm:text-2xl font-medium text-primary leading-normal" dir="rtl">
                     {w.translation_ur}
                   </p>
                 ) : null}
@@ -383,7 +383,7 @@ function WordDetailPage() {
                   <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground text-left" dir="ltr">
                     Urdu Meaning
                   </p>
-                  <p className="font-urdu text-2xl sm:text-3xl text-foreground leading-loose pt-1">
+                  <p className="font-urdu text-xl sm:text-2xl text-foreground/90 font-medium leading-relaxed pt-1">
                     {w.translation_ur}
                   </p>
                 </div>
@@ -464,7 +464,7 @@ function WordDetailPage() {
 
                           {sentence.ur && (
                             <p
-                              className="font-urdu text-xl sm:text-2xl text-foreground/90 text-right leading-loose pt-1"
+                              className="font-urdu text-lg sm:text-xl text-foreground/90 text-right leading-relaxed pt-1"
                               dir="rtl"
                             >
                               {sentence.ur}
