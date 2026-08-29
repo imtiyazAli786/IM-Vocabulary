@@ -207,6 +207,7 @@ function WordDetailPage() {
 
   const tags = Array.isArray(w.tags) ? (w.tags as string[]) : [];
   const collocations = Array.isArray(w.collocations) ? (w.collocations as string[]) : [];
+  const spectrum = extractFormalitySpectrum(w);
 
   const sentences: ExampleItem[] =
     Array.isArray(w.examples) && w.examples.length > 0
