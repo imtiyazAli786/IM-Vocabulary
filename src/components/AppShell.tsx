@@ -3,9 +3,9 @@ import { BookOpen, MessageSquareQuote, Layers, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
+  { to: "/review", icon: Layers, label: "Review" },
   { to: "/words", icon: BookOpen, label: "Words" },
   { to: "/sentences", icon: MessageSquareQuote, label: "Sentences" },
-  { to: "/review", icon: Layers, label: "Review" },
   { to: "/quiz", icon: Trophy, label: "Quiz" },
 ];
 

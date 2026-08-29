@@ -249,19 +249,19 @@ function WordsPage() {
                     }}
                   >
                     <Card
-                      className="p-4 hover:shadow-elevated transition-all duration-200 shadow-card cursor-pointer border-border/80 hover:border-primary/40 bg-card rounded-2xl group space-y-2.5"
+                      className="p-3.5 sm:p-4 hover:shadow-elevated transition-all duration-200 shadow-card cursor-pointer border-border/80 hover:border-primary/40 bg-card rounded-xl group"
                       onClick={() => navigate({ to: "/words/$id", params: { id: w.id } })}
                     >
-                      {/* Row 1: English Word + Type/POS on Left; Urdu Meaning on Right */}
-                      <div className="flex items-start justify-between gap-3">
-                        {/* Left Column: Word & English Meaning */}
+                      {/* Clean Single-Row / 2-Column: English Word + Meaning on Left; Urdu Meaning on Right */}
+                      <div className="flex items-center justify-between gap-3">
+                        {/* Left Column: Word, Part of Speech & Meaning */}
                         <div className="min-w-0 flex-1 space-y-0.5">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-display font-bold text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">
+                            <h3 className="font-display font-bold text-base sm:text-lg text-foreground tracking-tight group-hover:text-primary transition-colors">
                               {w.word}
                             </h3>
                             {w.part_of_speech && (
-                              <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
                                 {w.part_of_speech}
                               </span>
                             )}
@@ -274,9 +274,9 @@ function WordsPage() {
                             )}
                           </div>
 
-                          {/* One-Word English Meaning / Definition */}
+                          {/* English Meaning (First line only) */}
                           {w.one_word_en ? (
-                            <p className="text-sm font-medium text-muted-foreground truncate">
+                            <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">
                               <span className="text-foreground/85 font-semibold">{w.one_word_en}</span>
                               {w.definition_en && w.definition_en.toLowerCase() !== w.one_word_en.toLowerCase() && (
                                 <span className="text-xs text-muted-foreground/80 ml-1.5 font-normal">
@@ -291,7 +291,7 @@ function WordsPage() {
                           ) : null}
                         </div>
 
-                        {/* Right Column: Urdu Meaning in Clean Nastaliq Typography */}
+                        {/* Right Column: Urdu Meaning */}
                         <div className="text-right shrink-0 max-w-[45%]">
                           {w.one_word_ur ? (
                             <p className="font-urdu text-lg sm:text-xl text-primary font-medium leading-normal" dir="rtl">
@@ -304,46 +304,6 @@ function WordsPage() {
                           ) : null}
                         </div>
                       </div>
-
-                      {/* Row 2: Clean Synonyms & Antonyms Badges */}
-                      {(w.synonym || w.antonym) && (
-                        <div className="flex items-center gap-2 flex-wrap pt-0.5 text-xs">
-                          {w.synonym && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-medium">
-                              <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">Syn</span>
-                              <span>{w.synonym}</span>
-                            </span>
-                          )}
-                          {w.antonym && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-700 dark:text-rose-300 font-medium">
-                              <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">Ant</span>
-                              <span>{w.antonym}</span>
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Row 3: Tags & Collocations Footer */}
-                      {(itemTags.length > 0 || itemCols.length > 0) && (
-                        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/50 text-[11px]">
-                          {itemTags.slice(0, 3).map((t) => (
-                            <span
-                              key={t}
-                              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium text-[11px]"
-                            >
-                              <Tag className="w-2.5 h-2.5" /> #{t}
-                            </span>
-                          ))}
-                          {itemCols.slice(0, 2).map((col) => (
-                            <span
-                              key={col}
-                              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground text-[11px]"
-                            >
-                              <BookMarked className="w-2.5 h-2.5 opacity-70" /> {col}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </Card>
                   </div>
                 );
