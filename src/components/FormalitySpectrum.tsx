@@ -1,4 +1,4 @@
-import { FormalitySpectrumData, REGISTER_CONFIG } from "@/lib/formality";
+import { FormalitySpectrumData, CATEGORY_CONFIG, PermanentCategory } from "@/lib/formality";
 import { speak } from "@/lib/speech";
 import { Volume2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,37 +11,38 @@ interface FormalitySpectrumProps {
 }
 
 export function FormalitySpectrum({ data, headword, className }: FormalitySpectrumProps) {
+  const currentCat = data.category || "daily-life";
+
   const rows: Array<{
-    key: "formal" | "neutral" | "informal";
+    key: PermanentCategory;
     title: string;
     sub: string;
     icon: string;
     val: string;
   }> = [
     {
-      key: "formal",
-      title: "Formal",
-      sub: "Newspapers / Articles",
+      key: "daily-life",
+      title: "Daily Life",
+      sub: "Home, Friends, Shows",
+      icon: "🏠",
+      val: data.informal || (currentCat === "daily-life" ? headword : ""),
+    },
+    {
+      key: "workplace",
+      title: "Workplace",
+      sub: "Office & Meetings",
+      icon: "💼",
+      val: data.neutral || (currentCat === "workplace" ? headword : ""),
+    },
+    {
+      key: "news-reading",
+      title: "News Reading",
+      sub: "Articles & Formal",
       icon: "📰",
-      val: data.formal || (data.register === "formal" ? headword : ""),
-    },
-    {
-      key: "neutral",
-      title: "Neutral",
-      sub: "Everyday Life",
-      icon: "💬",
-      val: data.neutral || (data.register === "neutral" ? headword : ""),
-    },
-    {
-      key: "informal",
-      title: "Informal",
-      sub: "Reality Shows / Slang",
-      icon: "🎬",
-      val: data.informal || (data.register === "informal" ? headword : ""),
+      val: data.formal || (currentCat === "news-reading" ? headword : ""),
     },
   ];
 
-  // If no equivalents at all, don't render empty box
   const hasValues = rows.some((r) => r.val && r.val.trim().length > 0);
   if (!hasValues) return null;
 
@@ -54,21 +55,21 @@ export function FormalitySpectrum({ data, headword, className }: FormalitySpectr
     >
       <div className="flex items-center justify-between border-b border-border/60 pb-1.5">
         <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <Sparkles className="w-3 h-3 text-primary" /> Formality Spectrum
+          <Sparkles className="w-3 h-3 text-primary" /> Usage Spectrum
         </span>
         <span
           className={cn(
             "text-[10px] font-semibold px-2 py-0.5 rounded-full border",
-            REGISTER_CONFIG[data.register]?.colorBadge || "bg-muted text-muted-foreground"
+            CATEGORY_CONFIG[currentCat]?.colorBadge || "bg-muted text-muted-foreground"
           )}
         >
-          {REGISTER_CONFIG[data.register]?.shortLabel || "Register"}
+          {CATEGORY_CONFIG[currentCat]?.shortLabel || "Category"}
         </span>
       </div>
 
       <div className="divide-y divide-border/40 text-xs sm:text-sm">
         {rows.map((r) => {
-          const isActive = r.key === data.register;
+          const isActive = r.key === currentCat;
           const displayVal = r.val || "—";
           return (
             <div

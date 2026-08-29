@@ -55,24 +55,28 @@ function WordsPage() {
     refetchOnMount: "always",
   });
 
-  // Calculate register counts
-  const registerCounts = useMemo(() => {
-    if (!allRawWords) return { all: 0, informal: 0, formal: 0, neutral: 0 };
-    const counts = { all: allRawWords.length, informal: 0, formal: 0, neutral: 0 };
+  // Calculate situation category counts
+  const categoryCounts = useMemo(() => {
+    if (!allRawWords) return { all: 0, "daily-life": 0, workplace: 0, "news-reading": 0 };
+    const counts = { all: allRawWords.length, "daily-life": 0, workplace: 0, "news-reading": 0 };
     allRawWords.forEach((w) => {
-      const reg = extractFormalitySpectrum(w).register;
-      counts[reg] = (counts[reg] || 0) + 1;
+      const cat = extractFormalitySpectrum(w).category;
+      counts[cat] = (counts[cat] || 0) + 1;
     });
     return counts;
   }, [allRawWords]);
 
-  // Filter by search query & register
+  // Filter by search query & category
   const filteredWords = useMemo(() => {
     if (!allRawWords) return [];
     let list = allRawWords;
 
-    if (register && ["formal", "neutral", "informal"].includes(register)) {
-      list = list.filter((w) => extractFormalitySpectrum(w).register === register);
+    if (register) {
+      const normalized =
+        register === "informal" ? "daily-life" : register === "neutral" ? "workplace" : register === "formal" ? "news-reading" : register;
+      if (["daily-life", "workplace", "news-reading"].includes(normalized)) {
+        list = list.filter((w) => extractFormalitySpectrum(w).category === normalized);
+      }
     }
 
     if (q?.trim()) {
@@ -159,7 +163,7 @@ function WordsPage() {
         />
       </div>
 
-      {/* 3-Tier Formality Register Filter Bar */}
+      {/* 3 Permanent Situation Category Filter Bar */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
         <button
           type="button"
@@ -171,49 +175,49 @@ function WordsPage() {
               : "bg-card text-muted-foreground border-border hover:text-foreground"
           )}
         >
-          All ({registerCounts.all})
+          All ({categoryCounts.all})
         </button>
 
         <button
           type="button"
-          onClick={() => handleRegisterToggle("informal")}
+          onClick={() => handleRegisterToggle("daily-life")}
           className={cn(
             "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
-            register === "informal"
+            register === "daily-life" || register === "informal"
               ? "bg-purple-600 text-white border-purple-600 shadow-sm"
               : "bg-card text-muted-foreground border-border hover:text-foreground"
           )}
         >
-          <span>🎬 Informal (Shows)</span>
-          <span className="text-[10px] opacity-75 font-mono">({registerCounts.informal})</span>
+          <span>🏠 Daily Life</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts["daily-life"]})</span>
         </button>
 
         <button
           type="button"
-          onClick={() => handleRegisterToggle("formal")}
+          onClick={() => handleRegisterToggle("workplace")}
           className={cn(
             "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
-            register === "formal"
-              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
-          )}
-        >
-          <span>📰 Formal (News)</span>
-          <span className="text-[10px] opacity-75 font-mono">({registerCounts.formal})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleRegisterToggle("neutral")}
-          className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
-            register === "neutral"
+            register === "workplace" || register === "neutral"
               ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
               : "bg-card text-muted-foreground border-border hover:text-foreground"
           )}
         >
-          <span>💬 Neutral (Everyday)</span>
-          <span className="text-[10px] opacity-75 font-mono">({registerCounts.neutral})</span>
+          <span>💼 Workplace</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts.workplace})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => handleRegisterToggle("news-reading")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            register === "news-reading" || register === "formal"
+              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>📰 News Reading</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts["news-reading"]})</span>
         </button>
       </div>
 

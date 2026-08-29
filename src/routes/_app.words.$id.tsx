@@ -409,16 +409,11 @@ function WordDetailPage() {
               )}
             </div>
 
-            {(tags.length > 0 || collocations.length > 0) && (
+            {collocations.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-border/60">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
-                  >
-                    <Tag className="w-3 h-3" /> #{tag}
-                  </span>
-                ))}
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mr-1">
+                  Collocations:
+                </span>
                 {collocations.map((col) => (
                   <span
                     key={col}

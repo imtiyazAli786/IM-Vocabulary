@@ -37,6 +37,7 @@ function AddWordPage() {
   const [form, setForm] = useState({
     word: "",
     type: "word" as "word" | "phrase" | "connector" | "idiom" | "tense_pattern",
+    category: "daily-life" as "daily-life" | "workplace" | "news-reading",
     part_of_speech: "",
     one_word_en: "",
     one_word_ur: "",
@@ -45,7 +46,6 @@ function AddWordPage() {
     definition_en: "",
     translation_ur: "",
     notes: "",
-    tagsInput: "",
     collocationsInput: "",
   });
 
@@ -111,24 +111,20 @@ function AddWordPage() {
       } else if (r.example_en || r.example_ur) {
         setExamples([{ en: r.example_en || "", ur: r.example_ur || "" }]);
       }
-      const registerTag = r.register ? [r.register] : [];
-      const combinedTags = Array.from(
-        new Set([...registerTag, ...(r.tags || [])])
-      );
-      const generatedTags = combinedTags.length > 0 ? combinedTags.join(", ") : form.tagsInput;
 
-      const spectrumMeta = r.register
-        ? JSON.stringify({
-            register: r.register,
-            formal: r.formal_equivalent || (r.register === "formal" ? form.word.trim() : ""),
-            neutral: r.neutral_equivalent || (r.register === "neutral" ? form.word.trim() : ""),
-            informal: r.spoken_equivalent || (r.register === "informal" ? form.word.trim() : ""),
-          })
-        : "";
+      const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
+
+      const spectrumMeta = JSON.stringify({
+        category: detectedCat,
+        formal: r.formal || r.formal_equivalent || (detectedCat === "news-reading" ? form.word.trim() : ""),
+        neutral: r.neutral || r.neutral_equivalent || (detectedCat === "workplace" ? form.word.trim() : ""),
+        informal: r.informal || r.spoken_equivalent || (detectedCat === "daily-life" ? form.word.trim() : ""),
+      });
 
       setForm((f) => ({
         ...f,
         type: inferredType,
+        category: detectedCat,
         part_of_speech: f.part_of_speech || r.part_of_speech || "",
         one_word_en: f.one_word_en || r.one_word_en || "",
         one_word_ur: f.one_word_ur || r.one_word_ur || "",
@@ -136,7 +132,6 @@ function AddWordPage() {
         antonym: f.antonym || r.antonym || "",
         definition_en: f.definition_en || r.definition_en || "",
         translation_ur: f.translation_ur || r.translation_ur || "",
-        tagsInput: f.tagsInput || generatedTags,
         collocationsInput: f.collocationsInput || generatedCollocations,
         notes: f.notes ? `${f.notes}\n${spectrumMeta}` : spectrumMeta,
       }));
@@ -155,11 +150,6 @@ function AddWordPage() {
     try {
       const { data: userRes } = await supabase.auth.getUser();
       if (!userRes.user) throw new Error("Not signed in");
-
-      const parsedTags = form.tagsInput
-        .split(/[,،]+/)
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean);
 
       const parsedCollocations = form.collocationsInput
         .split(/[,،\n]+/)
@@ -183,7 +173,7 @@ function AddWordPage() {
         example_en: primaryExample.en.trim() || null,
         example_ur: primaryExample.ur.trim() || null,
         examples: validExamples,
-        tags: parsedTags,
+        tags: [form.category],
         collocations: parsedCollocations,
         notes: form.notes.trim() || null,
       });
@@ -220,30 +210,62 @@ function AddWordPage() {
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">
-              Tap "AI fill" to auto-complete definition, Urdu, collocations, tags, and sentences.
+              Tap "AI fill" to auto-complete category, definition, Urdu, and daily dialogue sentences.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="type">Type *</Label>
-              <Select
-                value={form.type}
-                onValueChange={(val: typeof form.type) => setForm((f) => ({ ...f, type: val }))}
+          {/* 3 Permanent Situation Category Selector */}
+          <div>
+            <Label className="block text-xs font-semibold mb-1.5">Situation Category *</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, category: "daily-life" }))}
+                className={cn(
+                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  form.category === "daily-life"
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                )}
               >
-                <SelectTrigger className="mt-1.5 w-full">
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="word">Word</SelectItem>
-                  <SelectItem value="phrase">Phrase</SelectItem>
-                  <SelectItem value="connector">Connector</SelectItem>
-                  <SelectItem value="idiom">Idiom</SelectItem>
-                  <SelectItem value="tense_pattern">Tense Pattern</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+                <span className="text-sm">🏠</span>
+                <span className="font-semibold">Daily Life</span>
+                <span className="text-[9px] opacity-80 hidden sm:inline">Home & Friends</span>
+              </button>
 
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, category: "workplace" }))}
+                className={cn(
+                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  form.category === "workplace"
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                )}
+              >
+                <span className="text-sm">💼</span>
+                <span className="font-semibold">Workplace</span>
+                <span className="text-[9px] opacity-80 hidden sm:inline">Office & Meetings</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, category: "news-reading" }))}
+                className={cn(
+                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  form.category === "news-reading"
+                    ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                )}
+              >
+                <span className="text-sm">📰</span>
+                <span className="font-semibold">News Reading</span>
+                <span className="text-[9px] opacity-80 hidden sm:inline">Articles & Essays</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <Label htmlFor="pos">Part of speech</Label>
               <Input
@@ -254,22 +276,6 @@ function AddWordPage() {
                 className="mt-1.5"
               />
             </div>
-          </div>
-
-          {/* Tags & Collocations */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="tags" className="flex items-center gap-1">
-                <Tag className="w-3.5 h-3.5 text-muted-foreground" /> Tags
-              </Label>
-              <Input
-                id="tags"
-                placeholder="daily, academic, business"
-                value={form.tagsInput}
-                onChange={update("tagsInput")}
-                className="mt-1.5 text-sm"
-              />
-            </div>
 
             <div>
               <Label htmlFor="collocations" className="flex items-center gap-1">
@@ -277,7 +283,7 @@ function AddWordPage() {
               </Label>
               <Input
                 id="collocations"
-                placeholder="resilient to, highly..."
+                placeholder="put off until, hang out with..."
                 value={form.collocationsInput}
                 onChange={update("collocationsInput")}
                 className="mt-1.5 text-sm"

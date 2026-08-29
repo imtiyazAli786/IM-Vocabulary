@@ -9,23 +9,23 @@ const Input = z.object({
 const SYSTEM = `You are an expert bilingual English-Urdu vocabulary and language teacher.
 Your highest priority is to provide Urdu translations that are CRYSTAL CLEAR, NATURAL, and EXTREMELY EASY TO UNDERSTAND for everyday learners.
 
-CRITICAL FORMALITY & CONVERSATIONAL SPECTRUM RULES:
-1. REGISTER CLASSIFICATION: Classify the input word into exactly ONE of 3 registers:
-   - "formal" (used in Newspapers, Editorials, Writing, Academic, e.g. "postpone", "commence", "inquire", "resilient")
-   - "neutral" (used in Standard Everyday Life / Workplace, e.g. "delay", "start", "ask", "tough")
-   - "informal" (used in Reality Shows, Casual Spoken Chats, Slang, Phrasal Verbs, e.g. "put off", "kick off", "check in", "freak out")
-2. FORMALITY SPECTRUM: Provide the corresponding equivalent for ALL 3 tiers:
-   - formal_equivalent: the formal/newspaper equivalent (single word)
-   - neutral_equivalent: the everyday/workplace equivalent (single word)
-   - spoken_equivalent: the informal/reality-show/spoken equivalent (e.g. phrasal verb or casual term)
+CRITICAL SITUATION CATEGORY & USAGE RULES:
+1. CATEGORY CLASSIFICATION: Classify the input word into exactly ONE of 3 permanent situation categories:
+   - "daily-life" (Home, family conversations, friends, reality shows, casual chat, phrasal verbs, e.g. "put off", "hang out", "chill", "wiped out")
+   - "workplace" (Office environment, team meetings, workplace discussions, professional emails, e.g. "delay", "follow up", "deadline", "align")
+   - "news-reading" (Newspaper articles, serious writing, editorials, essays, e.g. "postpone", "commence", "inquire", "resilient")
+2. USAGE SPECTRUM: Provide the corresponding equivalent for ALL 3 situations:
+   - informal: the daily-life / home / friends / reality-show equivalent (phrasal verb or casual term)
+   - neutral: the workplace / office / standard daily equivalent (single word)
+   - formal: the news-reading / formal newspaper equivalent (single word)
 3. SIMPLE URDU: Use simple, common, conversational Urdu (عام فہم اور روزمرہ کی آسان اردو).
 4. STRICTLY AVOID difficult, heavy, archaic, literary, Persianized words (e.g., do NOT use "استفسار", "معاونت", "مسرت", "تحیر", "مستعد", "استقامت", "ادراک"). INSTEAD use simple words: "پوچھنا", "مدد", "خوشی", "حیرانی", "تیار", "مضبوط رہنا", "سمجھنا".
 
 Given an English word, return ONLY compact JSON with these keys:
-- register: "formal" | "neutral" | "informal"
-- formal_equivalent: single formal/newspaper word
-- neutral_equivalent: single standard everyday word
-- spoken_equivalent: conversational / reality-show / phrasal verb equivalent
+- category: "daily-life" | "workplace" | "news-reading"
+- informal: spoken / home / friends / reality-show equivalent
+- neutral: office / workplace / standard everyday equivalent
+- formal: newspaper / editorial / formal equivalent
 - part_of_speech: noun, verb, adjective, adverb, phrase, etc.
 - one_word_en: a SINGLE common English word that means the same (just one word).
 - one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word (one word in Urdu script).
@@ -33,9 +33,9 @@ Given an English word, return ONLY compact JSON with these keys:
 - antonym: ONE common English antonym.
 - definition_en: a simple, clear definition in plain English.
 - translation_ur: a SIMPLE, clear, everyday Urdu meaning in ONE short sentence (max 15 words).
-- tags: an array of 2 to 3 practical category tags (including the register: "formal", "neutral", or "informal").
+- tags: an array of 1 to 2 permanent situation tags (e.g. ["daily-life"] or ["workplace"] or ["news-reading"]).
 - collocations: an array of 2 to 3 natural spoken collocations/phrases commonly used in daily conversation.
-- example_en: primary daily-life spoken conversation sentence (max 18 words). Wrap the headword in quotes.
+- example_en: primary daily-life or workplace conversation sentence (max 18 words). Wrap the headword in quotes.
 - example_ur: the primary example translated into SHORT, VERY SIMPLE, natural spoken Urdu.
 - examples: an array of 2 to 3 distinct practical conversational example sentences with VERY SIMPLE spoken Urdu translations.
 
@@ -71,7 +71,11 @@ export const enrichWord = createServerFn({ method: "POST" })
     const content = j.choices?.[0]?.message?.content ?? "{}";
     try {
       return JSON.parse(content) as {
-        register?: "formal" | "neutral" | "informal";
+        category?: "daily-life" | "workplace" | "news-reading";
+        register?: "daily-life" | "workplace" | "news-reading" | "formal" | "neutral" | "informal";
+        informal?: string;
+        neutral?: string;
+        formal?: string;
         formal_equivalent?: string;
         neutral_equivalent?: string;
         spoken_equivalent?: string;
@@ -103,14 +107,14 @@ const FormalityBatchInput = z.object({
 });
 
 const FORMALITY_BATCH_SYSTEM = `You are an expert bilingual vocabulary analyzer.
-Classify each English word into one of 3 Formality Registers and provide its 3-tier Formality Spectrum:
-- register: "formal" (Newspapers/Articles) | "neutral" (Everyday Life) | "informal" (Reality Shows / Slang / Phrasal Verbs)
-- formal: newspaper equivalent word
-- neutral: everyday standard equivalent word
-- informal: spoken reality-show / phrasal verb equivalent
+Classify each English word into one of 3 Permanent Situation Categories and provide its 3-tier Spectrum:
+- category: "daily-life" (Home, Friends, Shows) | "workplace" (Office, Meetings, Professional) | "news-reading" (Newspaper Articles, Formal Writing)
+- informal: daily-life / friends / reality-show / phrasal verb equivalent
+- neutral: workplace / office / standard equivalent
+- formal: newspaper / editorial / formal equivalent
 
 Return ONLY a JSON object:
-{"results": [{"id": "<id>", "register": "formal"|"neutral"|"informal", "formal": "...", "neutral": "...", "informal": "..."}]}
+{"results": [{"id": "<id>", "category": "daily-life"|"workplace"|"news-reading", "formal": "...", "neutral": "...", "informal": "..."}]}
 `;
 
 export const classifyAndEnrichFormalityBatch = createServerFn({ method: "POST" })
@@ -133,7 +137,7 @@ export const classifyAndEnrichFormalityBatch = createServerFn({ method: "POST" }
         model,
         messages: [
           { role: "system", content: FORMALITY_BATCH_SYSTEM },
-          { role: "user", content: `Analyze the formality spectrum for these words:\n\n${wordList}` },
+          { role: "user", content: `Analyze the situation categories for these words:\n\n${wordList}` },
         ],
         response_format: { type: "json_object" },
       }),
@@ -142,7 +146,7 @@ export const classifyAndEnrichFormalityBatch = createServerFn({ method: "POST" }
     if (!res.ok) {
       const err = await res.text();
       console.error(`AI formality batch error: ${res.status} ${err.slice(0, 300)}`);
-      throw new Error("Failed to classify formality batch.");
+      throw new Error("Failed to classify situation category batch.");
     }
 
     const j = await res.json();
@@ -159,7 +163,8 @@ export const classifyAndEnrichFormalityBatch = createServerFn({ method: "POST" }
       return {
         results: results as Array<{
           id: string;
-          register: "formal" | "neutral" | "informal";
+          category?: "daily-life" | "workplace" | "news-reading";
+          register?: "formal" | "neutral" | "informal" | "daily-life" | "workplace" | "news-reading";
           formal: string;
           neutral: string;
           informal: string;

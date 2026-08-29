@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyAndEnrichFormalityBatch } from "@/lib/ai.functions";
+import { normalizeCategory, CATEGORY_CONFIG, PermanentCategory } from "@/lib/formality";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -39,7 +40,7 @@ export function UpgradeFormalityModal({
         .order("created_at", { ascending: false });
 
       if (error || !words || words.length === 0) {
-        toast.error("No words found to upgrade.");
+        toast.error("No words found to categorize.");
         setUpgrading(false);
         return;
       }
@@ -63,14 +64,11 @@ export function UpgradeFormalityModal({
                 const target = chunk.find((w) => w.id === r.id);
                 if (!target) return;
 
-                const currentTags = Array.isArray(target.tags) ? target.tags : [];
-                // Add register tag if not present
-                const updatedTags = Array.from(
-                  new Set([...currentTags.filter((t) => !["formal", "neutral", "informal"].includes(t)), r.register])
-                );
+                const cat: PermanentCategory = normalizeCategory(r.category || r.register);
+                const updatedTags = [cat];
 
                 const spectrumMetadata = JSON.stringify({
-                  register: r.register,
+                  category: cat,
                   formal: r.formal,
                   neutral: r.neutral,
                   informal: r.informal,
@@ -78,8 +76,8 @@ export function UpgradeFormalityModal({
 
                 // Prepend or update notes with spectrum metadata
                 let updatedNotes = target.notes || "";
-                if (updatedNotes.includes('"register"')) {
-                  updatedNotes = updatedNotes.replace(/\{[\s\S]*"register"[\s\S]*\}/, spectrumMetadata);
+                if (updatedNotes.includes('"category"') || updatedNotes.includes('"register"')) {
+                  updatedNotes = updatedNotes.replace(/\{[\s\S]*"(category|register)"[\s\S]*\}/, spectrumMetadata);
                 } else {
                   updatedNotes = spectrumMetadata + (updatedNotes ? "\n" + updatedNotes : "");
                 }
@@ -102,13 +100,13 @@ export function UpgradeFormalityModal({
       }
 
       setIsDone(true);
-      toast.success(`Successfully upgraded all ${total} words with Formality Spectrum!`);
+      toast.success(`Successfully categorized all ${total} words!`);
       qc.invalidateQueries({ queryKey: ["review-words"] });
       qc.invalidateQueries({ queryKey: ["words"] });
-      qc.invalidateQueries({ queryKey: ["user-tags"] });
+      qc.invalidateQueries({ queryKey: ["words-all-raw"] });
       onComplete?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to upgrade words");
+      toast.error(err instanceof Error ? err.message : "Failed to categorize words");
     } finally {
       setUpgrading(false);
     }
@@ -123,28 +121,28 @@ export function UpgradeFormalityModal({
           className="gap-1.5 text-xs font-medium border-primary/30 text-primary hover:bg-primary/10"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>✨ Upgrade Formality Spectrum</span>
+          <span>✨ Categorize Library</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-display">
-            <Sparkles className="w-5 h-5 text-primary" /> Auto-Upgrade Library
+            <Sparkles className="w-5 h-5 text-primary" /> Auto-Categorize Library
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground pt-1">
-            Gemini AI will analyze all your uploaded vocabulary words and classify them into:
+            Gemini AI will clean up tags and classify all your vocabulary into 3 situation pillars:
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2.5 py-2 text-xs">
-          <div className="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-900 dark:text-sky-200">
-            <span className="font-bold">📰 Formal (Newspapers / Articles):</span> e.g. <i>Postpone, Commence</i>
+          <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-900 dark:text-purple-200">
+            <span className="font-bold">🏠 #daily-life:</span> Home, family, friends, reality shows & casual chat
           </div>
           <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-200">
-            <span className="font-bold">💬 Neutral (Everyday Life):</span> e.g. <i>Delay, Start</i>
+            <span className="font-bold">💼 #workplace:</span> Office environment, team meetings, emails & coworkers
           </div>
-          <div className="p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-900 dark:text-purple-200">
-            <span className="font-bold">🎬 Informal (Reality Shows / Slang):</span> e.g. <i>Put off, Kick off</i>
+          <div className="p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-900 dark:text-sky-200">
+            <span className="font-bold">📰 #news-reading:</span> Newspaper articles, formal writing & editorials
           </div>
         </div>
 
@@ -153,7 +151,7 @@ export function UpgradeFormalityModal({
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                Analyzing words with AI...
+                Categorizing with AI...
               </span>
               <span>
                 {progress.current} / {progress.total}
@@ -172,7 +170,7 @@ export function UpgradeFormalityModal({
 
         {isDone && (
           <div className="p-3 rounded-lg bg-success/15 border border-success/30 flex items-center gap-2 text-success text-xs font-semibold">
-            <Check className="w-4 h-4" /> All words have been categorized into 3 Formality Tiers!
+            <Check className="w-4 h-4" /> All words organized into 3 permanent situation tags!
           </div>
         )}
 
@@ -194,11 +192,11 @@ export function UpgradeFormalityModal({
             >
               {upgrading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Upgrading...
+                  <Loader2 className="w-4 h-4 animate-spin" /> Categorizing...
                 </>
               ) : (
                 <>
-                  <RefreshCw className="w-4 h-4" /> Start 1-Click Upgrade
+                  <RefreshCw className="w-4 h-4" /> Start 1-Click Categorization
                 </>
               )}
             </Button>
