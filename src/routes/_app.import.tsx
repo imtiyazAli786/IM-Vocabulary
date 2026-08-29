@@ -203,24 +203,38 @@ function ImportPage() {
         return "word";
       };
 
-      const rows = deduplicated.map((e) => ({
-        user_id: userRes.user.id,
-        word: e.word.trim(),
-        type: sanitizeType(e.type, e.word),
-        part_of_speech: e.part_of_speech?.trim() || null,
-        one_word_en: e.one_word_en?.trim() || null,
-        one_word_ur: e.one_word_ur?.trim() || null,
-        synonym: e.synonym?.trim() || null,
-        antonym: e.antonym?.trim() || null,
-        definition_en: e.definition_en?.trim() || null,
-        translation_ur: e.translation_ur?.trim() || null,
-        example_en: e.example_en?.trim() || null,
-        example_ur: e.example_ur?.trim() || null,
-        examples: e.example_en?.trim() ? [{ en: e.example_en.trim(), ur: e.example_ur?.trim() || "" }] : [],
-        tags: [] as string[],
-        collocations: [] as string[],
-        notes: e.notes?.trim() || null,
-      }));
+      const rows = deduplicated.map((e) => {
+        const reg = (e.register || "").toLowerCase().trim();
+        const registerTag = ["formal", "neutral", "informal"].includes(reg) ? [reg] : [];
+
+        const spectrumMeta = reg
+          ? JSON.stringify({
+              register: reg,
+              formal: e.formal_equivalent || (reg === "formal" ? e.word.trim() : ""),
+              neutral: e.neutral_equivalent || (reg === "neutral" ? e.word.trim() : ""),
+              informal: e.spoken_equivalent || (reg === "informal" ? e.word.trim() : ""),
+            })
+          : "";
+
+        return {
+          user_id: userRes.user.id,
+          word: e.word.trim(),
+          type: sanitizeType(e.type, e.word),
+          part_of_speech: e.part_of_speech?.trim() || null,
+          one_word_en: e.one_word_en?.trim() || null,
+          one_word_ur: e.one_word_ur?.trim() || null,
+          synonym: e.synonym?.trim() || null,
+          antonym: e.antonym?.trim() || null,
+          definition_en: e.definition_en?.trim() || null,
+          translation_ur: e.translation_ur?.trim() || null,
+          example_en: e.example_en?.trim() || null,
+          example_ur: e.example_ur?.trim() || null,
+          examples: e.example_en?.trim() ? [{ en: e.example_en.trim(), ur: e.example_ur?.trim() || "" }] : [],
+          tags: registerTag,
+          collocations: [] as string[],
+          notes: spectrumMeta ? (e.notes ? `${spectrumMeta}\n${e.notes}` : spectrumMeta) : (e.notes?.trim() || null),
+        };
+      });
 
       // Insert in batches of 100 to prevent timeouts/payload limit issues
       const chunkSize = 100;

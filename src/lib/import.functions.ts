@@ -19,6 +19,10 @@ CRITICAL URDU & CONVERSATIONAL RULES:
 
 Given raw text from a user's vocabulary document, extract every vocabulary word/entry and return ONLY a JSON object in the exact format {"entries": [...]}. Each entry object must have these keys (use empty string if missing):
 - word: the English word
+- register: "formal" (Newspapers/Articles) | "neutral" (Everyday Life) | "informal" (Reality Shows / Slang / Phrasal Verbs)
+- formal_equivalent: single formal/newspaper word
+- neutral_equivalent: single standard everyday word
+- spoken_equivalent: conversational / reality-show / phrasal verb equivalent
 - part_of_speech: noun, verb, adjective, etc.
 - one_word_en: a SINGLE common English word with the same meaning (one word only)
 - one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word (one word in Urdu script).
@@ -28,7 +32,7 @@ Given raw text from a user's vocabulary document, extract every vocabulary word/
 - translation_ur: a SIMPLE, clear, everyday Urdu meaning in ONE short sentence (max 15 words).
 - example_en: a practical spoken/conversational example sentence. Wrap the headword in quotes.
 - example_ur: the example translated into VERY SIMPLE, natural spoken Urdu (max 14 words).
-- notes: any extra context or conversational notes
+- notes: any extra context or formality metadata
 
 Return ONLY valid JSON matching {"entries": [...]}. Infer missing fields when possible.`;
 

@@ -24,6 +24,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  FormalityRegister,
+  REGISTER_CONFIG,
+  extractFormalitySpectrum,
+} from "@/lib/formality";
+import { FormalitySpectrum } from "@/components/FormalitySpectrum";
+import { UpgradeFormalityModal } from "@/components/UpgradeFormalityModal";
 
 export const Route = createFileRoute("/_app/review")({
   component: ReviewPage,
@@ -34,7 +41,7 @@ const SWIPE_THRESHOLD = 80; // px to commit a swipe
 const STORAGE_LAST_INDEX = "lafz_review_last_index";
 const STORAGE_DECK_TYPE = "lafz_review_deck_type";
 const STORAGE_MODE = "lafz_review_mode";
-const STORAGE_TAG = "lafz_review_tag";
+const STORAGE_REGISTER = "lafz_review_register";
 
 interface ExampleItem {
   en: string;
@@ -84,12 +91,13 @@ function ReviewPage() {
     }
   });
 
-  const [selectedTag, setSelectedTag] = useState<string>(() => {
+  // 3-Tier Register Filter ("all" | "informal" | "formal" | "neutral")
+  const [selectedRegister, setSelectedRegister] = useState<"all" | FormalityRegister>(() => {
     try {
-      if (typeof window === "undefined") return "";
-      return localStorage.getItem(STORAGE_TAG) || "";
+      if (typeof window === "undefined") return "all";
+      return (localStorage.getItem(STORAGE_REGISTER) as "all" | FormalityRegister) || "all";
     } catch {
-      return "";
+      return "all";
     }
   });
 
@@ -113,26 +121,9 @@ function ReviewPage() {
     });
   }, []);
 
-  // Fetch all tags for filter
-  const { data: allTags } = useQuery({
-    queryKey: ["user-tags"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("words").select("tags").limit(300);
-      if (error) return [];
-      const tagSet = new Set<string>();
-      data?.forEach((row) => {
-        if (Array.isArray(row.tags)) {
-          row.tags.forEach((t) => t && tagSet.add(t.trim().toLowerCase()));
-        }
-      });
-      return Array.from(tagSet).sort();
-    },
-    staleTime: 60_000,
-  });
-
-  // Fetch words based on deck type and tag
-  const { data: words, isLoading } = useQuery({
-    queryKey: ["review-words", deckType, selectedTag],
+  // Fetch words based on deck type
+  const { data: rawWords, isLoading } = useQuery({
+    queryKey: ["review-words", deckType],
     queryFn: async () => {
       let query = supabase.from("words").select("*");
 
@@ -140,13 +131,9 @@ function ReviewPage() {
         query = query.lte("due_at", new Date().toISOString());
       }
 
-      if (selectedTag.trim()) {
-        query = query.contains("tags", [selectedTag.trim().toLowerCase()]);
-      }
-
       const { data, error } = await query
         .order(deckType === "due" ? "due_at" : "created_at", { ascending: deckType === "due" })
-        .limit(200);
+        .limit(300);
 
       if (error) throw error;
       return data ?? [];
@@ -154,6 +141,24 @@ function ReviewPage() {
     staleTime: 0,
     refetchOnMount: "always",
   });
+
+  // Calculate register counts
+  const registerCounts = useMemo(() => {
+    if (!rawWords) return { all: 0, informal: 0, formal: 0, neutral: 0 };
+    const counts = { all: rawWords.length, informal: 0, formal: 0, neutral: 0 };
+    rawWords.forEach((w) => {
+      const reg = extractFormalitySpectrum(w).register;
+      counts[reg] = (counts[reg] || 0) + 1;
+    });
+    return counts;
+  }, [rawWords]);
+
+  // Filter words by active Formality Register
+  const words = useMemo(() => {
+    if (!rawWords) return [];
+    if (selectedRegister === "all") return rawWords;
+    return rawWords.filter((w) => extractFormalitySpectrum(w).register === selectedRegister);
+  }, [rawWords, selectedRegister]);
 
   // Save current position and deck preferences
   const updateDeckType = (type: "due" | "all") => {
@@ -173,12 +178,12 @@ function ReviewPage() {
     } catch {}
   };
 
-  const updateSelectedTag = (tag: string) => {
-    setSelectedTag(tag);
+  const updateSelectedRegister = (reg: "all" | FormalityRegister) => {
+    setSelectedRegister(reg);
     setIdx(0);
     setFlipped(false);
     try {
-      localStorage.setItem(STORAGE_TAG, tag);
+      localStorage.setItem(STORAGE_REGISTER, reg);
       localStorage.setItem(STORAGE_LAST_INDEX, "0");
     } catch {}
   };
@@ -472,12 +477,12 @@ function ReviewPage() {
   const showUpHint = dragY < -20;
   const showDownHint = dragY > 20;
 
-  const currentTags = Array.isArray(current.tags) ? current.tags : [];
   const currentCols = Array.isArray(current.collocations) ? current.collocations : [];
+  const spectrum = extractFormalitySpectrum(current);
 
   return (
     <div className="space-y-3 max-w-xl mx-auto pb-4 overflow-hidden">
-      {/* Top Header with Deck & Mode Switchers */}
+      {/* Top Header with Deck, Formality Upgrade, & Mode Switchers */}
       <header className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-display font-semibold">Review</h1>
@@ -487,30 +492,33 @@ function ReviewPage() {
           </p>
         </div>
 
-        {/* Deck Mode Toggle (All vs Due) */}
-        <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
-          <button
-            type="button"
-            onClick={() => updateDeckType("all")}
-            className={cn(
-              "px-2.5 py-1 rounded-md font-medium transition-colors",
-              deckType === "all" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
-            )}
-            title="Review all words continuously in sequence"
-          >
-            All ({totalCount})
-          </button>
-          <button
-            type="button"
-            onClick={() => updateDeckType("due")}
-            className={cn(
-              "px-2.5 py-1 rounded-md font-medium transition-colors",
-              deckType === "due" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
-            )}
-            title="Review only words due by spaced repetition"
-          >
-            Due
-          </button>
+        <div className="flex items-center gap-1.5">
+          <UpgradeFormalityModal />
+          {/* Deck Mode Toggle (All vs Due) */}
+          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
+            <button
+              type="button"
+              onClick={() => updateDeckType("all")}
+              className={cn(
+                "px-2.5 py-1 rounded-md font-medium transition-colors",
+                deckType === "all" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+              title="Review all words continuously in sequence"
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => updateDeckType("due")}
+              className={cn(
+                "px-2.5 py-1 rounded-md font-medium transition-colors",
+                deckType === "due" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+              title="Review only words due by spaced repetition"
+            >
+              Due
+            </button>
+          </div>
         </div>
       </header>
 
@@ -524,75 +532,69 @@ function ReviewPage() {
         </div>
       </div>
 
-      {/* Mode & Tag Filters */}
-      <div className="flex items-center justify-between gap-2 text-xs">
-        {/* Cloze vs Flashcard Mode Toggle */}
-        <div className="flex items-center rounded-lg bg-muted/70 p-0.5 border border-border">
-          <button
-            type="button"
-            onClick={() => updateReviewMode("cloze")}
-            className={cn(
-              "px-2 py-1 rounded-md font-medium transition-colors flex items-center gap-1",
-              reviewMode === "cloze"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <BookOpen className="w-3.5 h-3.5" /> Sentence Cloze
-          </button>
-          <button
-            type="button"
-            onClick={() => updateReviewMode("classic")}
-            className={cn(
-              "px-2 py-1 rounded-md font-medium transition-colors flex items-center gap-1",
-              reviewMode === "classic"
-                ? "bg-card text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <Layers className="w-3.5 h-3.5" /> Flashcard
-          </button>
-        </div>
+      {/* 3-Tier Formality Register Filter Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
+        <button
+          type="button"
+          onClick={() => updateSelectedRegister("all")}
+          className={cn(
+            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedRegister === "all"
+              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          All ({registerCounts.all})
+        </button>
 
-        {/* Tag filter pills */}
-        {allTags && allTags.length > 0 && (
-          <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none text-[11px]">
-            <button
-              type="button"
-              onClick={() => updateSelectedTag("")}
-              className={cn(
-                "px-2 py-0.5 rounded-full font-medium transition-colors shrink-0",
-                !selectedTag
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground",
-              )}
-            >
-              All Tags
-            </button>
-            {allTags.slice(0, 4).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => updateSelectedTag(t === selectedTag ? "" : t)}
-                className={cn(
-                  "inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full font-medium transition-colors shrink-0 border",
-                  selectedTag === t
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground",
-                )}
-              >
-                <Tag className="w-2.5 h-2.5" /> #{t}
-              </button>
-            ))}
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => updateSelectedRegister("informal")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedRegister === "informal"
+              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>🎬 Informal (Shows)</span>
+          <span className="text-[10px] opacity-75 font-mono">({registerCounts.informal})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => updateSelectedRegister("formal")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedRegister === "formal"
+              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>📰 Formal (News)</span>
+          <span className="text-[10px] opacity-75 font-mono">({registerCounts.formal})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => updateSelectedRegister("neutral")}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedRegister === "neutral"
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>💬 Neutral (Everyday)</span>
+          <span className="text-[10px] opacity-75 font-mono">({registerCounts.neutral})</span>
+        </button>
       </div>
 
       {/* Main Flashcard Container */}
       <div
         className="relative touch-none select-none"
         style={{
-          height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 15rem)",
+          height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 15.5rem)",
           minHeight: 360,
         }}
       >
@@ -618,7 +620,7 @@ function ReviewPage() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="h-full w-full p-5 sm:p-7 flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative"
+          className="h-full w-full p-4 sm:p-6 flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative"
           style={{
             transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
             opacity,
@@ -628,55 +630,60 @@ function ReviewPage() {
           {!flipped ? (
             /* FRONT OF CARD */
             reviewMode === "cloze" && cloze ? (
-              <div className="space-y-4 max-w-md my-auto">
-                <span className="text-[11px] uppercase tracking-wider font-bold text-primary px-2.5 py-0.5 rounded-full bg-primary/10">
-                  Sentence in Context
-                </span>
+              <div className="space-y-3.5 max-w-md my-auto">
+                <div className="flex items-center justify-center gap-1.5">
+                  <span
+                    className={cn(
+                      "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
+                      REGISTER_CONFIG[spectrum.register]?.colorBadge || "bg-primary/10 text-primary"
+                    )}
+                  >
+                    {REGISTER_CONFIG[spectrum.register]?.label || "Context"}
+                  </span>
+                </div>
                 <p className="text-xl sm:text-2xl font-serif leading-relaxed px-2 text-foreground">
                   "{cloze.masked}"
                 </p>
                 {primarySentence?.ur && (
-                  <p className="font-urdu text-xl sm:text-2xl text-muted-foreground pt-1 leading-relaxed" dir="rtl">
+                  <p className="font-urdu text-xl sm:text-2xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
                     {primarySentence.ur}
                   </p>
                 )}
                 {current.part_of_speech && (
                   <p className="text-xs text-muted-foreground italic font-mono">({current.part_of_speech})</p>
                 )}
-                <div className="pt-3">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1.5 px-3 rounded-full mx-auto w-fit">
-                    <RotateCw className="w-3 h-3" /> Tap card to reveal target word
+                <div className="pt-2">
+                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
+                    <RotateCw className="w-3 h-3" /> Tap card to reveal word & spectrum
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-3.5 my-auto">
-                <Sparkles className="w-7 h-7 text-primary mx-auto opacity-80" />
+              <div className="space-y-3 my-auto">
+                <span
+                  className={cn(
+                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border inline-block",
+                    REGISTER_CONFIG[spectrum.register]?.colorBadge || "bg-primary/10 text-primary"
+                  )}
+                >
+                  {REGISTER_CONFIG[spectrum.register]?.label}
+                </span>
                 <p className="text-3xl sm:text-4xl font-display font-bold text-foreground">{current.word}</p>
                 {current.part_of_speech && (
                   <p className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground inline-block">
                     {current.part_of_speech}
                   </p>
                 )}
-                {currentTags.length > 0 && (
-                  <div className="flex justify-center gap-1 pt-1">
-                    {currentTags.slice(0, 3).map((t) => (
-                      <span key={t} className="text-[11px] text-muted-foreground">
-                        #{t}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <div className="pt-4">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1.5 px-3 rounded-full mx-auto w-fit">
-                    <RotateCw className="w-3 h-3" /> Tap card to reveal meaning
+                <div className="pt-3">
+                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
+                    <RotateCw className="w-3 h-3" /> Tap card to reveal meaning & spectrum
                   </p>
                 </div>
               </div>
             )
           ) : (
             /* BACK OF CARD */
-            <div className="space-y-3.5 w-full max-w-md my-auto">
+            <div className="space-y-3 w-full max-w-md my-auto">
               <div className="flex items-center justify-center gap-2">
                 <p className="text-3xl sm:text-4xl font-display font-bold text-primary">
                   {current.word}
@@ -720,32 +727,15 @@ function ReviewPage() {
                 </p>
               )}
 
-              {current.definition_en && (
-                <p className="text-sm text-muted-foreground leading-relaxed px-1">
-                  {current.definition_en}
-                </p>
-              )}
-
-              {/* Collocations preview */}
-              {currentCols.length > 0 && (
-                <div className="flex flex-wrap justify-center gap-1.5 py-0.5 text-xs">
-                  {currentCols.slice(0, 2).map((c) => (
-                    <span
-                      key={c}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary text-secondary-foreground text-[11px]"
-                    >
-                      <BookMarked className="w-2.5 h-2.5 opacity-70" /> {c}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* Formality Spectrum Component */}
+              <FormalitySpectrum data={spectrum} headword={current.word} />
 
               {/* Sentence Audio & Phrasing */}
               {primarySentence?.en && (
-                <div className="p-3 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1 mt-2">
+                <div className="p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
-                      Example
+                      Example Dialogue
                     </span>
                     <Button
                       type="button"
@@ -760,9 +750,9 @@ function ReviewPage() {
                       <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
                     </Button>
                   </div>
-                  <p className="text-sm italic font-serif">"{primarySentence.en}"</p>
+                  <p className="text-xs sm:text-sm italic font-serif">"{primarySentence.en}"</p>
                   {primarySentence.ur && (
-                    <p className="font-urdu text-base text-right pt-0.5 leading-relaxed" dir="rtl">
+                    <p className="font-urdu text-sm text-right pt-0.5 leading-relaxed" dir="rtl">
                       {primarySentence.ur}
                     </p>
                   )}

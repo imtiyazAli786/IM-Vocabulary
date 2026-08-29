@@ -96,8 +96,6 @@ function AddWordPage() {
         inferredType = "phrase";
       }
 
-      const generatedTags = r.tags && r.tags.length > 0 ? r.tags.join(", ") : form.tagsInput;
-
       const generatedCollocations =
         r.collocations && r.collocations.length > 0
           ? r.collocations.join(", ")
@@ -113,6 +111,20 @@ function AddWordPage() {
       } else if (r.example_en || r.example_ur) {
         setExamples([{ en: r.example_en || "", ur: r.example_ur || "" }]);
       }
+      const registerTag = r.register ? [r.register] : [];
+      const combinedTags = Array.from(
+        new Set([...registerTag, ...(r.tags || [])])
+      );
+      const generatedTags = combinedTags.length > 0 ? combinedTags.join(", ") : form.tagsInput;
+
+      const spectrumMeta = r.register
+        ? JSON.stringify({
+            register: r.register,
+            formal: r.formal_equivalent || (r.register === "formal" ? form.word.trim() : ""),
+            neutral: r.neutral_equivalent || (r.register === "neutral" ? form.word.trim() : ""),
+            informal: r.spoken_equivalent || (r.register === "informal" ? form.word.trim() : ""),
+          })
+        : "";
 
       setForm((f) => ({
         ...f,
@@ -126,6 +138,7 @@ function AddWordPage() {
         translation_ur: f.translation_ur || r.translation_ur || "",
         tagsInput: f.tagsInput || generatedTags,
         collocationsInput: f.collocationsInput || generatedCollocations,
+        notes: f.notes ? `${f.notes}\n${spectrumMeta}` : spectrumMeta,
       }));
       toast.success("Filled with AI suggestions");
     } catch (e) {

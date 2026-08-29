@@ -34,6 +34,12 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { speak } from "@/lib/speech";
 import { TYPE_COLORS, formatType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import {
+  FormalityRegister,
+  REGISTER_CONFIG,
+  extractFormalitySpectrum,
+} from "@/lib/formality";
+import { FormalitySpectrum } from "@/components/FormalitySpectrum";
 
 export const Route = createFileRoute("/_app/words/$id")({
   component: WordDetailPage,
@@ -308,6 +314,15 @@ function WordDetailPage() {
                       {w.part_of_speech}
                     </span>
                   )}
+                  {/* Register Badge */}
+                  <span
+                    className={cn(
+                      "text-[10px] font-semibold px-2.5 py-0.5 rounded-full border",
+                      REGISTER_CONFIG[spectrum.register]?.colorBadge || "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {REGISTER_CONFIG[spectrum.register]?.label}
+                  </span>
                   {w.type && w.type !== "word" && (
                     <span
                       className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded font-semibold ${TYPE_COLORS[w.type] || "bg-muted text-muted-foreground"}`}
@@ -330,6 +345,9 @@ function WordDetailPage() {
                 ) : null}
               </div>
             </div>
+
+            {/* Formality Spectrum Module */}
+            <FormalitySpectrum data={spectrum} headword={w.word} />
 
             {(w.one_word_en || w.synonym || w.antonym) && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
