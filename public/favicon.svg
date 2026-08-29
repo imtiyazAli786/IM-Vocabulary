@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#F6F3EC"/>
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A6270"/>
+      <stop offset="100%" stop-color="#0F434D"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Squircle with Subtle Border -->
+  <rect x="1" y="1" width="30" height="30" rx="7.5" fill="url(#bgGrad)" stroke="#E4DED5" stroke-width="1.2"/>
+
+  <!-- Minimal Open Book Icon -->
+  <path d="M7.5 10C7.5 10 10 9 14.5 10.2V22.5C10 21.3 7.5 22.3 7.5 22.3V10Z" fill="url(#primaryGrad)" fill-opacity="0.95"/>
+  <path d="M24.5 10C24.5 10 22 9 17.5 10.2V22.5C22 21.3 24.5 22.3 24.5 22.3V10Z" fill="url(#primaryGrad)"/>
+  <line x1="16" y1="10.2" x2="16" y2="22.5" stroke="#FAF9F6" stroke-width="1" stroke-linecap="round"/>
+
+  <!-- Minimal Sparkling Star / Accent -->
+  <path d="M22.5 5.5C22.5 7 24 8.5 25.5 8.5C24 8.5 22.5 10 22.5 11.5C22.5 10 21 8.5 19.5 8.5C21 8.5 22.5 7 22.5 5.5Z" fill="url(#accentGrad)"/>
+</svg>
