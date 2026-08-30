@@ -66,6 +66,12 @@ function AddWordPage() {
     { en: searchParams?.example || "", ur: searchParams?.exampleUr || "" }
   ]);
 
+  const [spectrumBridge, setSpectrumBridge] = useState({
+    formal: "",
+    neutral: "",
+    informal: "",
+  });
+
   const [busy, setBusy] = useState(false);
   const [enriching, setEnriching] = useState(false);
 
@@ -222,21 +228,39 @@ function AddWordPage() {
       </header>
 
       <form onSubmit={handleSave} className="space-y-4">
-        <Card className="p-4 space-y-4 shadow-card">
+        <Card className="p-4 sm:p-5 space-y-4 shadow-card">
+          {/* 1. Word & AI Fill */}
           <div>
-            <Label htmlFor="word">Word or Phrase *</Label>
+            <Label htmlFor="word" className="text-xs font-semibold">
+              Word or Phrase <span className="text-destructive">*</span>
+            </Label>
             <div className="flex gap-2 mt-1.5">
-              <Input id="word" value={form.word} onChange={update("word")} required autoFocus />
-              <Button type="button" variant="outline" onClick={handleEnrich} disabled={enriching}>
-                <Wand2 className="w-4 h-4 mr-1" /> {enriching ? "…" : "AI fill"}
+              <Input
+                id="word"
+                value={form.word}
+                onChange={update("word")}
+                required
+                autoFocus
+                placeholder="Type word or phrase..."
+                className="h-10 text-base"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleEnrich}
+                disabled={enriching}
+                className="h-10 px-3.5 bg-primary/5 hover:bg-primary/10 border-primary/20 text-primary font-medium shrink-0"
+              >
+                <Wand2 className="w-4 h-4 mr-1.5" />
+                {enriching ? "Filling…" : "AI fill"}
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Tap "AI fill" to auto-complete category, definition, Urdu, and daily dialogue sentences.
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Tap "AI fill" to automatically populate meanings, category, synonyms, and dialogue.
             </p>
           </div>
 
-          {/* 3 Permanent Situation Category Selector */}
+          {/* 2. Situation Category Selector */}
           <div>
             <Label className="block text-xs font-semibold mb-1.5">Situation Category *</Label>
             <div className="grid grid-cols-3 gap-2">
@@ -244,63 +268,157 @@ function AddWordPage() {
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, category: "daily-life" }))}
                 className={cn(
-                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "daily-life"
-                    ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                    ? "bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
                     : "bg-card text-muted-foreground border-border hover:text-foreground"
                 )}
               >
-                <span className="text-sm">🏠</span>
-                <span className="font-semibold">Daily Life</span>
-                <span className="text-[9px] opacity-80 hidden sm:inline">Home & Friends</span>
+                <span className="text-base">🏠</span>
+                <span className="font-semibold text-xs">Daily Life</span>
+                <span className="text-[10px] opacity-80 hidden sm:inline">Home & Friends</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, category: "workplace" }))}
                 className={cn(
-                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "workplace"
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-600/20"
                     : "bg-card text-muted-foreground border-border hover:text-foreground"
                 )}
               >
-                <span className="text-sm">💼</span>
-                <span className="font-semibold">Workplace</span>
-                <span className="text-[9px] opacity-80 hidden sm:inline">Office & Meetings</span>
+                <span className="text-base">💼</span>
+                <span className="font-semibold text-xs">Workplace</span>
+                <span className="text-[10px] opacity-80 hidden sm:inline">Office & Meetings</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, category: "news-reading" }))}
                 className={cn(
-                  "py-2 px-2.5 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5",
+                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "news-reading"
-                    ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+                    ? "bg-sky-600 text-white border-sky-600 shadow-sm ring-2 ring-sky-600/20"
                     : "bg-card text-muted-foreground border-border hover:text-foreground"
                 )}
               >
-                <span className="text-sm">📰</span>
-                <span className="font-semibold">News Reading</span>
-                <span className="text-[9px] opacity-80 hidden sm:inline">Articles & Essays</span>
+                <span className="text-base">📰</span>
+                <span className="font-semibold text-xs">News Reading</span>
+                <span className="text-[10px] opacity-80 hidden sm:inline">Articles & Essays</span>
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="pos">Part of speech</Label>
-              <Input
-                id="pos"
-                placeholder="noun, verb, adjective…"
-                value={form.part_of_speech}
-                onChange={update("part_of_speech")}
-                className="mt-1.5"
-              />
+          {/* 3. Core Meanings (English & Urdu Aligned) */}
+          <div className="pt-2 border-t border-border/60 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="def" className="text-xs font-semibold">
+                  English Definition
+                </Label>
+                <Textarea
+                  id="def"
+                  rows={2}
+                  placeholder="Clear English definition..."
+                  value={form.definition_en}
+                  onChange={update("definition_en")}
+                  className="mt-1.5 text-sm resize-none"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="ur" className="text-xs font-semibold">
+                  Urdu Meaning (عام فہم اردو)
+                </Label>
+                <Textarea
+                  id="ur"
+                  rows={2}
+                  placeholder="انتہائی آسان اور عام فہم اردو میں معنی..."
+                  value={form.translation_ur}
+                  onChange={update("translation_ur")}
+                  className="mt-1.5 font-urdu text-base sm:text-lg resize-none"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+
+            {/* Quick 1-Word Meanings */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="one-en" className="text-xs font-semibold">
+                  Quick 1-Word (EN)
+                </Label>
+                <Input
+                  id="one-en"
+                  placeholder="e.g. tough"
+                  value={form.one_word_en}
+                  onChange={update("one_word_en")}
+                  className="mt-1.5 h-10 text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="one-ur" className="text-xs font-semibold">
+                  Quick 1-Word (UR)
+                </Label>
+                <Input
+                  id="one-ur"
+                  placeholder="مضبوط"
+                  value={form.one_word_ur}
+                  onChange={update("one_word_ur")}
+                  className="mt-1.5 h-10 font-urdu text-base leading-normal"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Vocabulary Details & Collocations */}
+          <div className="pt-2 border-t border-border/60 space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="pos" className="text-xs font-semibold">
+                  Part of Speech
+                </Label>
+                <Input
+                  id="pos"
+                  placeholder="noun, verb, adj…"
+                  value={form.part_of_speech}
+                  onChange={update("part_of_speech")}
+                  className="mt-1.5 h-10 text-sm"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="syn" className="text-xs font-semibold">
+                  Synonym
+                </Label>
+                <Input
+                  id="syn"
+                  placeholder="e.g. strong"
+                  value={form.synonym}
+                  onChange={update("synonym")}
+                  className="mt-1.5 h-10 text-sm"
+                />
+              </div>
+
+              <div className="col-span-2 sm:col-span-1">
+                <Label htmlFor="ant" className="text-xs font-semibold">
+                  Antonym
+                </Label>
+                <Input
+                  id="ant"
+                  placeholder="e.g. weak"
+                  value={form.antonym}
+                  onChange={update("antonym")}
+                  className="mt-1.5 h-10 text-sm"
+                />
+              </div>
             </div>
 
             <div>
-              <Label htmlFor="collocations" className="flex items-center gap-1">
+              <Label htmlFor="collocations" className="flex items-center gap-1 text-xs font-semibold">
                 <BookMarked className="w-3.5 h-3.5 text-muted-foreground" /> Collocations
               </Label>
               <Input
@@ -308,89 +426,18 @@ function AddWordPage() {
                 placeholder="put off until, hang out with..."
                 value={form.collocationsInput}
                 onChange={update("collocationsInput")}
-                className="mt-1.5 text-sm"
+                className="mt-1.5 h-10 text-sm"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="one-en">One-word meaning (EN)</Label>
-              <Input
-                id="one-en"
-                placeholder="e.g. tough"
-                value={form.one_word_en}
-                onChange={update("one_word_en")}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="one-ur">One-word meaning (UR)</Label>
-              <Input
-                id="one-ur"
-                placeholder="مضبوط"
-                value={form.one_word_ur}
-                onChange={update("one_word_ur")}
-                className="mt-1.5 font-urdu text-lg"
-                dir="rtl"
-              />
-            </div>
-            <div>
-              <Label htmlFor="syn">Synonym</Label>
-              <Input
-                id="syn"
-                placeholder="e.g. strong"
-                value={form.synonym}
-                onChange={update("synonym")}
-                className="mt-1.5"
-              />
-            </div>
-            <div>
-              <Label htmlFor="ant">Antonym</Label>
-              <Input
-                id="ant"
-                placeholder="e.g. weak"
-                value={form.antonym}
-                onChange={update("antonym")}
-                className="mt-1.5"
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="def">English definition</Label>
-            <Textarea
-              id="def"
-              rows={2}
-              value={form.definition_en}
-              onChange={update("definition_en")}
-              className="mt-1.5"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="ur">Urdu meaning (Simple & Easy — عام فہم اردو)</Label>
-            <Textarea
-              id="ur"
-              rows={2}
-              placeholder="انتہائی آسان اور عام فہم اردو میں معنی..."
-              value={form.translation_ur}
-              onChange={update("translation_ur")}
-              className="mt-1.5 font-urdu text-xl"
-              dir="rtl"
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Use common everyday words, not heavy or difficult literary words.
-            </p>
-          </div>
-
-          {/* Multiple Context Sentences */}
-          <div className="space-y-3 pt-2 border-t border-border">
+          {/* 5. Context Example Sentences */}
+          <div className="space-y-3 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm font-semibold">Context Example Sentences</Label>
+                <Label className="text-xs font-semibold">Context Example Sentences</Label>
                 <p className="text-[11px] text-muted-foreground">
-                  With natural, easy-to-understand Urdu translations
+                  Natural English dialogue with simple Urdu translations
                 </p>
               </div>
               <Button
@@ -399,60 +446,64 @@ function AddWordPage() {
                 size="sm"
                 onClick={addExample}
                 disabled={examples.length >= 4}
+                className="h-8 text-xs gap-1"
               >
-                <Plus className="w-3.5 h-3.5 mr-1" /> Add sentence
+                <Plus className="w-3.5 h-3.5" /> Add sentence
               </Button>
             </div>
 
             {examples.map((ex, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-lg border border-border/80 bg-muted/20 space-y-2 relative"
+                className="p-3.5 rounded-xl border border-border/80 bg-muted/15 space-y-2 relative"
               >
-                <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
-                  <span>Sentence {idx + 1}</span>
+                <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
+                  <span>Dialogue #{idx + 1}</span>
                   {examples.length > 1 && (
                     <button
                       type="button"
                       onClick={() => removeExample(idx)}
-                      className="text-destructive hover:opacity-80 p-1"
+                      className="text-destructive hover:opacity-80 p-1 cursor-pointer"
+                      title="Remove sentence"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
-                <Textarea
+                <Input
                   placeholder="English example sentence..."
-                  rows={2}
                   value={ex.en}
                   onChange={(e) => updateExample(idx, "en", e.target.value)}
-                  className="bg-card"
+                  className="bg-card h-10 text-sm"
                 />
-                <Textarea
+                <Input
                   placeholder="آسان اور عام فہم اردو ترجمہ..."
-                  rows={2}
                   value={ex.ur}
                   onChange={(e) => updateExample(idx, "ur", e.target.value)}
-                  className="bg-card font-urdu text-lg"
+                  className="bg-card h-10 font-urdu text-base leading-normal"
                   dir="rtl"
                 />
               </div>
             ))}
           </div>
 
-          <div>
-            <Label htmlFor="notes">Notes</Label>
+          {/* 6. Optional Notes */}
+          <div className="pt-2 border-t border-border/60">
+            <Label htmlFor="notes" className="text-xs font-semibold">
+              Personal Notes <span className="text-muted-foreground font-normal">(Optional)</span>
+            </Label>
             <Textarea
               id="notes"
               rows={2}
+              placeholder="Add your own personal learning notes..."
               value={form.notes}
               onChange={update("notes")}
-              className="mt-1.5"
+              className="mt-1.5 text-sm resize-none"
             />
           </div>
         </Card>
 
-        <Button type="submit" disabled={busy} className="w-full" size="lg">
+        <Button type="submit" disabled={busy} className="w-full h-11 text-sm font-semibold" size="lg">
           <Save className="w-4 h-4 mr-2" /> {busy ? "Saving…" : "Save entry"}
         </Button>
       </form>
