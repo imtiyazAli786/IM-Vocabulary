@@ -112,7 +112,7 @@ function AddWordPage() {
     try {
       const r = await enrich({ data: { word: form.word.trim() } });
 
-      let inferredType = (r.type as WordType) || form.type || "word";
+      let inferredType = (r.type as any) || form.type || "word";
       if (form.type === "word" && form.word.trim().split(/\s+/).length > 1) {
         inferredType = "phrase";
       }
@@ -120,7 +120,7 @@ function AddWordPage() {
       const generatedCollocations =
         r.collocations && r.collocations.length > 0
           ? r.collocations.join(", ")
-          : form.collocationsInput;
+          : "";
 
       if (r.examples && r.examples.length > 0) {
         setExamples(
@@ -131,6 +131,8 @@ function AddWordPage() {
         );
       } else if (r.example_en || r.example_ur) {
         setExamples([{ en: r.example_en || "", ur: r.example_ur || "" }]);
+      } else {
+        setExamples([{ en: "", ur: "" }]);
       }
 
       const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
@@ -141,20 +143,21 @@ function AddWordPage() {
         informal: r.informal || r.spoken_equivalent || "",
       });
 
+      // Clear any previous/stale values and overwrite completely with fresh AI answers
       setForm((f) => ({
         ...f,
         type: inferredType,
         category: detectedCat,
-        part_of_speech: f.part_of_speech || r.part_of_speech || "",
-        one_word_en: f.one_word_en || r.one_word_en || "",
-        one_word_ur: f.one_word_ur || r.one_word_ur || "",
-        synonym: f.synonym || r.synonym || "",
-        antonym: f.antonym || r.antonym || "",
-        definition_en: f.definition_en || r.definition_en || "",
-        translation_ur: f.translation_ur || r.translation_ur || "",
-        collocationsInput: f.collocationsInput || generatedCollocations,
+        part_of_speech: r.part_of_speech || "",
+        one_word_en: r.one_word_en || "",
+        one_word_ur: r.one_word_ur || "",
+        synonym: r.synonym || "",
+        antonym: r.antonym || "",
+        definition_en: r.definition_en || "",
+        translation_ur: r.translation_ur || "",
+        collocationsInput: generatedCollocations,
       }));
-      toast.success("Filled with AI suggestions");
+      toast.success("Fresh AI answers populated");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "AI fill failed");
     } finally {
