@@ -766,7 +766,7 @@ function ReviewPage() {
 
               {/* Urdu Definition */}
               {current.translation_ur && (
-                <p className="font-urdu text-lg sm:text-2xl text-foreground font-medium leading-relaxed px-1" dir="rtl">
+                <p className="font-urdu text-lg sm:text-xl text-foreground font-medium leading-relaxed px-1" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
@@ -797,7 +797,7 @@ function ReviewPage() {
                   </div>
                   <p className="text-xs sm:text-sm italic font-serif text-foreground">"{primarySentence.en}"</p>
                   {primarySentence.ur && (
-                    <p className="font-urdu text-xs sm:text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
+                    <p className="font-urdu text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
                       {primarySentence.ur}
                     </p>
                   )}
@@ -828,11 +828,11 @@ function ReviewPage() {
                 <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground text-center">
                   Fill in the missing word
                 </p>
-                <p className="text-xl sm:text-2xl font-serif leading-relaxed px-2 text-foreground">
+                <p className="text-lg sm:text-xl font-serif leading-relaxed px-2 text-foreground">
                   "{cloze ? cloze.masked : `[ ${current.word} ]`}"
                 </p>
                 {primarySentence?.ur && (
-                  <p className="font-urdu text-xl sm:text-2xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
+                  <p className="font-urdu text-lg sm:text-xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
                     {primarySentence.ur}
                   </p>
                 )}

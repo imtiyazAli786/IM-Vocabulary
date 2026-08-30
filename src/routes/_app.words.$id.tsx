@@ -336,11 +336,11 @@ function WordDetailPage() {
 
               <div className="text-right shrink-0">
                 {w.one_word_ur ? (
-                  <p className="font-urdu text-2xl sm:text-3xl font-semibold text-primary leading-normal" dir="rtl">
+                  <p className="font-urdu text-xl sm:text-2xl font-semibold text-primary leading-normal" dir="rtl">
                     {w.one_word_ur}
                   </p>
                 ) : w.translation_ur ? (
-                  <p className="font-urdu text-xl sm:text-2xl font-medium text-primary leading-normal" dir="rtl">
+                  <p className="font-urdu text-lg sm:text-xl font-medium text-primary leading-normal" dir="rtl">
                     {w.translation_ur}
                   </p>
                 ) : null}

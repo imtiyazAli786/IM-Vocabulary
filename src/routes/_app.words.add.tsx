@@ -17,9 +17,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Wand2, ArrowLeft, Save, Plus, Trash2, Tag, BookMarked } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { z } from "zod";
 import { toast } from "sonner";
 
+const addWordSearchSchema = z.object({
+  word: z.string().optional().catch(""),
+  ur: z.string().optional().catch(""),
+  def: z.string().optional().catch(""),
+  example: z.string().optional().catch(""),
+  exampleUr: z.string().optional().catch(""),
+  tag: z.string().optional().catch("daily-life"),
+});
+
 export const Route = createFileRoute("/_app/words/add")({
+  validateSearch: (search) => addWordSearchSchema.parse(search),
   component: AddWordPage,
   head: () => ({ meta: [{ title: "Add entry — Lafz" }] }),
 });
@@ -32,24 +44,27 @@ interface ExamplePair {
 function AddWordPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const searchParams = Route.useSearch();
   const enrich = useServerFn(enrichWord);
 
   const [form, setForm] = useState({
-    word: "",
+    word: searchParams?.word || "",
     type: "word" as "word" | "phrase" | "connector" | "idiom" | "tense_pattern",
-    category: "daily-life" as "daily-life" | "workplace" | "news-reading",
+    category: (searchParams?.tag === "daily" ? "daily-life" : (searchParams?.tag as any)) || "daily-life",
     part_of_speech: "",
     one_word_en: "",
     one_word_ur: "",
     synonym: "",
     antonym: "",
-    definition_en: "",
-    translation_ur: "",
+    definition_en: searchParams?.def || "",
+    translation_ur: searchParams?.ur || "",
     notes: "",
     collocationsInput: "",
   });
 
-  const [examples, setExamples] = useState<ExamplePair[]>([{ en: "", ur: "" }]);
+  const [examples, setExamples] = useState<ExamplePair[]>([
+    { en: searchParams?.example || "", ur: searchParams?.exampleUr || "" }
+  ]);
 
   const [busy, setBusy] = useState(false);
   const [enriching, setEnriching] = useState(false);

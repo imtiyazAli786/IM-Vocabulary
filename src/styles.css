@@ -135,7 +135,7 @@
   }
   .font-urdu {
     font-family: var(--font-urdu);
-    line-height: 2;
+    line-height: 1.85;
     direction: rtl;
   }
 }
