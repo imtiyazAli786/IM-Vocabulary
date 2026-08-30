@@ -707,7 +707,7 @@ function ReviewPage() {
           {!flipped ? (
             /* DEFAULT FRONT OF CARD: FULL USAGE SPECTRUM & MEANING */
             <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-0.5">
-              {/* Category Badge & Pronunciation */}
+              {/* Category Badge Bar */}
               <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
                 <span
                   className={cn(
@@ -718,54 +718,42 @@ function ReviewPage() {
                   {CATEGORY_CONFIG[spectrum.category]?.label}
                 </span>
 
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-xs rounded-full bg-muted/60 hover:bg-primary/10 text-foreground hover:text-primary gap-1"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speak(current.word);
-                  }}
-                  title="Pronounce word"
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span className="text-[10px]">Audio</span>
-                </Button>
+                {current.one_word_en && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {current.one_word_en}
+                  </span>
+                )}
               </div>
 
-              {/* Headword */}
-              <div>
-                <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight">
-                  {current.word}
-                </p>
-              </div>
-
-              {/* One-Word Quick Meanings (English & Urdu) - Symmetrical & Clean */}
-              {(current.one_word_en || current.one_word_ur) && (
-                <div className="flex items-center justify-center gap-2 pt-1 pb-0.5">
-                  {current.one_word_en && (
-                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-semibold tracking-wide">
-                      {current.one_word_en}
-                    </span>
-                  )}
-                  {current.one_word_en && current.one_word_ur && (
-                    <span className="text-muted-foreground/40 text-xs font-bold">•</span>
-                  )}
-                  {current.one_word_ur && (
-                    <span
-                      className="px-3 py-1 rounded-full bg-primary/10 text-primary font-urdu text-sm sm:text-base font-medium leading-none"
-                      dir="rtl"
-                    >
-                      {current.one_word_ur}
-                    </span>
-                  )}
+              {/* Hero Row: English Word + Audio on Left, Urdu 1-Word on Right */}
+              <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight text-left">
+                    {current.word}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      speak(current.word);
+                    }}
+                    className="w-8 h-8 rounded-full bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-sm"
+                    title="Pronounce word"
+                  >
+                    <Volume2 className="w-4 h-4" />
+                  </button>
                 </div>
-              )}
+
+                {current.one_word_ur && (
+                  <p className="font-urdu text-2xl sm:text-3xl font-bold text-primary leading-none text-right shrink-0" dir="rtl">
+                    {current.one_word_ur}
+                  </p>
+                )}
+              </div>
 
               {/* Urdu Definition */}
               {current.translation_ur && (
-                <p className="font-urdu text-base sm:text-lg text-foreground font-medium leading-relaxed px-3 pt-1" dir="rtl">
+                <p className="font-urdu text-base sm:text-lg text-foreground/90 font-medium leading-relaxed px-1 text-right pt-0.5" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
