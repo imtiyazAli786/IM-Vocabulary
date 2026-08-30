@@ -1,5 +1,25 @@
-export function getAiConfig() {
-  // 1. Check for NVIDIA Nemotron API Key
+export function getAiConfig(customKey?: string, customProvider?: "nvidia" | "gemini") {
+  // 1. If custom key is passed directly from client/settings
+  if (customKey && customKey.trim()) {
+    const key = customKey.trim();
+    const isNvidia = customProvider === "nvidia" || key.startsWith("nvapi-");
+    if (isNvidia) {
+      return {
+        provider: "nvidia",
+        apiKey: key,
+        url: "https://integrate.api.nvidia.com/v1/chat/completions",
+        model: "nvidia/llama-3.1-nemotron-70b-instruct",
+      };
+    }
+    return {
+      provider: "gemini",
+      apiKey: key,
+      url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      model: "gemini-2.5-flash-lite",
+    };
+  }
+
+  // 2. Check for NVIDIA Nemotron API Key in environment
   const nvidiaKey =
     process.env.NVIDIA_API_KEY ||
     (globalThis as any).NVIDIA_API_KEY ||
@@ -19,7 +39,7 @@ export function getAiConfig() {
     };
   }
 
-  // 2. Check for Google Gemini API Key
+  // 3. Check for Google Gemini API Key in environment
   const geminiKey =
     process.env.GEMINI_API_KEY ||
     (globalThis as any).GEMINI_API_KEY ||
@@ -42,5 +62,6 @@ export function getAiConfig() {
 
   throw new Error("AI service is unavailable. Please add NVIDIA_API_KEY or GEMINI_API_KEY to enable AI features.");
 }
+
 
 

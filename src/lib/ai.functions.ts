@@ -247,3 +247,48 @@ export const simplifySentencesBatch = createServerFn({ method: "POST" })
       return { translations: [] };
     }
   });
+
+const TestInput = z.object({
+  key: z.string().min(5),
+  provider: z.enum(["nvidia", "gemini"]),
+});
+
+export const testAiKey = createServerFn({ method: "POST" })
+  .validator((d: unknown) => TestInput.parse(d))
+  .handler(async ({ data }) => {
+    const { apiKey, url, model, provider } = getAiConfig(data.key, data.provider);
+
+    const start = Date.now();
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: "You are a bilingual translator. Return ONLY a JSON object: {\"status\": \"ok\", \"sample\": \"مضبوط\"}" },
+          { role: "user", content: "Test query: resilient" },
+        ],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    const elapsed = Date.now() - start;
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Connection failed (${res.status}): ${err.slice(0, 200)}`);
+    }
+
+    const j = await res.json();
+    return {
+      success: true,
+      provider,
+      model,
+      latencyMs: elapsed,
+      response: j.choices?.[0]?.message?.content,
+    };
+  });
+

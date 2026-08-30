@@ -5,20 +5,58 @@ import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Flame, BookOpen, Sparkles, LogOut, Trophy, Wand2 } from "lucide-react";
+import { Flame, BookOpen, Sparkles, LogOut, Trophy, Wand2, Cpu, Check, Eye, EyeOff, Key, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { regenerateAllUrduOneWord } from "@/lib/regenerate-urdu.functions";
+import { testAiKey } from "@/lib/ai.functions";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/profile")({
   component: ProfilePage,
   head: () => ({ meta: [{ title: "Profile — Lafz" }] }),
 });
 
+const STORAGE_CUSTOM_KEY = "lafz_custom_ai_key";
+const STORAGE_CUSTOM_PROVIDER = "lafz_custom_ai_provider";
+
 function ProfilePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const regenerate = useServerFn(regenerateAllUrduOneWord);
+  const testKeyFn = useServerFn(testAiKey);
+
   const [regenBusy, setRegenBusy] = useState(false);
+  const [testingKey, setTestingKey] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
+  const [selectedProvider, setSelectedProvider] = useState<"nvidia" | "gemini">(() => {
+    try {
+      if (typeof window === "undefined") return "gemini";
+      return (localStorage.getItem(STORAGE_CUSTOM_PROVIDER) as "nvidia" | "gemini") || "gemini";
+    } catch {
+      return "gemini";
+    }
+  });
+
+  const [apiKeyInput, setApiKeyInput] = useState<string>(() => {
+    try {
+      if (typeof window === "undefined") return "";
+      return localStorage.getItem(STORAGE_CUSTOM_KEY) || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [isSaved, setIsSaved] = useState<boolean>(() => {
+    try {
+      if (typeof window === "undefined") return false;
+      return !!localStorage.getItem(STORAGE_CUSTOM_KEY);
+    } catch {
+      return false;
+    }
+  });
 
   const { data } = useQuery({
     queryKey: ["profile-stats"],
@@ -40,6 +78,46 @@ function ProfilePage() {
       };
     },
   });
+
+  const handleSaveKey = () => {
+    if (!apiKeyInput.trim()) {
+      localStorage.removeItem(STORAGE_CUSTOM_KEY);
+      localStorage.removeItem(STORAGE_CUSTOM_PROVIDER);
+      setIsSaved(false);
+      toast.success("Custom API key removed. Using default engine.");
+      return;
+    }
+    localStorage.setItem(STORAGE_CUSTOM_KEY, apiKeyInput.trim());
+    localStorage.setItem(STORAGE_CUSTOM_PROVIDER, selectedProvider);
+    setIsSaved(true);
+    toast.success(`Saved ${selectedProvider === "nvidia" ? "NVIDIA Nemotron" : "Google Gemini"} API key!`);
+  };
+
+  const handleTestKey = async () => {
+    if (!apiKeyInput.trim()) {
+      toast.error("Please enter an API key first.");
+      return;
+    }
+    setTestingKey(true);
+    const tid = toast.loading("Testing API connection…");
+    try {
+      const res = await testKeyFn({
+        data: {
+          key: apiKeyInput.trim(),
+          provider: selectedProvider,
+        },
+      });
+      toast.success(
+        `Connected to ${res.model} (${res.latencyMs}ms)!`,
+        { id: tid }
+      );
+      handleSaveKey();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Connection test failed", { id: tid });
+    } finally {
+      setTestingKey(false);
+    }
+  };
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -69,6 +147,127 @@ function ProfilePage() {
         <p className="text-xs uppercase tracking-wider text-muted-foreground">Last 7 quizzes</p>
         <p className="text-3xl font-display font-semibold mt-2">{data?.avgScore ?? 0}%</p>
         <p className="text-sm text-muted-foreground mt-1">Average accuracy</p>
+      </Card>
+
+      {/* AI Translation & API Key Settings Card */}
+      <Card className="p-5 shadow-card space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-primary" />
+            <div>
+              <p className="font-display font-semibold">AI Translation Engine</p>
+              <p className="text-xs text-muted-foreground">
+                Configure your own NVIDIA Nemotron or Google Gemini API key
+              </p>
+            </div>
+          </div>
+          {isSaved && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
+              <Check className="w-3 h-3" /> Active
+            </span>
+          )}
+        </div>
+
+        {/* Provider Tabs */}
+        <div>
+          <Label className="text-xs font-semibold block mb-1.5">Select Engine</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedProvider("nvidia")}
+              className={cn(
+                "py-2.5 px-3 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-1 cursor-pointer",
+                selectedProvider === "nvidia"
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-600/20"
+                  : "bg-muted/30 text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <span className="font-bold flex items-center gap-1">
+                <Zap className="w-3.5 h-3.5" /> NVIDIA Nemotron
+              </span>
+              <span className="text-[10px] opacity-85">Llama-3.1-Nemotron-70B</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSelectedProvider("gemini")}
+              className={cn(
+                "py-2.5 px-3 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-1 cursor-pointer",
+                selectedProvider === "gemini"
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
+                  : "bg-muted/30 text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <span className="font-bold flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5" /> Google Gemini
+              </span>
+              <span className="text-[10px] opacity-85">Gemini 2.5 Flash Lite</span>
+            </button>
+          </div>
+        </div>
+
+        {/* API Key Input */}
+        <div className="space-y-1.5">
+          <Label htmlFor="api-key" className="text-xs font-semibold flex items-center gap-1">
+            <Key className="w-3.5 h-3.5 text-muted-foreground" />
+            {selectedProvider === "nvidia" ? "NVIDIA API Key" : "Google Gemini API Key"}
+          </Label>
+          <div className="relative">
+            <Input
+              id="api-key"
+              type={showKey ? "text" : "password"}
+              placeholder={
+                selectedProvider === "nvidia"
+                  ? "nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  : "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              }
+              value={apiKeyInput}
+              onChange={(e) => {
+                setApiKeyInput(e.target.value);
+                setIsSaved(false);
+              }}
+              className="pr-10 h-10 text-sm font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((s) => !s)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1"
+              title={showKey ? "Hide key" : "Show key"}
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            {selectedProvider === "nvidia"
+              ? "Get your key from https://build.nvidia.com/explore/discover"
+              : "Get your key from https://aistudio.google.com/app/apikey"}
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleTestKey}
+            disabled={testingKey || !apiKeyInput.trim()}
+            className="flex-1 text-xs h-9"
+          >
+            <Zap className="w-3.5 h-3.5 mr-1" />
+            {testingKey ? "Testing…" : "Test Connection"}
+          </Button>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleSaveKey}
+            className="flex-1 text-xs h-9"
+          >
+            <Check className="w-3.5 h-3.5 mr-1" />
+            Save Key
+          </Button>
+        </div>
       </Card>
 
       <Card className="p-5 shadow-card space-y-3">
