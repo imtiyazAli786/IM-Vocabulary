@@ -459,40 +459,31 @@ function AddWordPage() {
             <div className="rounded-xl border border-border bg-card divide-y divide-border/60 shadow-sm overflow-hidden">
               {examples.map((ex, idx) => (
                 <div key={idx} className="p-3 space-y-1.5 hover:bg-muted/10 transition-colors">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
-                        {idx + 1}
-                      </span>
-                      Sentence #{idx + 1}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="English example sentence..."
+                      value={ex.en}
+                      onChange={(e) => updateExample(idx, "en", e.target.value)}
+                      className="bg-background h-9 text-xs sm:text-sm flex-1"
+                    />
                     {examples.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeExample(idx)}
-                        className="text-destructive hover:opacity-80 p-0.5 cursor-pointer"
+                        className="text-muted-foreground hover:text-destructive p-1.5 rounded-md hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
                         title="Remove sentence"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
-
-                  <div className="space-y-1.5">
-                    <Input
-                      placeholder="English example sentence..."
-                      value={ex.en}
-                      onChange={(e) => updateExample(idx, "en", e.target.value)}
-                      className="bg-background h-9 text-xs sm:text-sm"
-                    />
-                    <Input
-                      placeholder="آسان اور عام فہم اردو ترجمہ..."
-                      value={ex.ur}
-                      onChange={(e) => updateExample(idx, "ur", e.target.value)}
-                      className="bg-background h-9 font-urdu text-sm sm:text-base leading-normal"
-                      dir="rtl"
-                    />
-                  </div>
+                  <Input
+                    placeholder="آسان اور عام فہم اردو ترجمہ..."
+                    value={ex.ur}
+                    onChange={(e) => updateExample(idx, "ur", e.target.value)}
+                    className="bg-background h-9 font-urdu text-sm sm:text-base leading-normal"
+                    dir="rtl"
+                  />
                 </div>
               ))}
             </div>
