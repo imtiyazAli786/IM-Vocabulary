@@ -1,21 +1,37 @@
-export function getAiConfig(customKey?: string, customProvider?: "nvidia" | "gemini") {
+export function getAiConfig(
+  customKey?: string,
+  customProvider?: "nvidia" | "openrouter" | "gemini",
+  customModel?: string
+) {
   // 1. If custom key is passed directly from client/settings
   if (customKey && customKey.trim()) {
     const key = customKey.trim();
+    const isOpenRouter = customProvider === "openrouter" || key.startsWith("sk-or-");
     const isNvidia = customProvider === "nvidia" || key.startsWith("nvapi-");
+
+    if (isOpenRouter) {
+      return {
+        provider: "openrouter",
+        apiKey: key,
+        url: "https://openrouter.ai/api/v1/chat/completions",
+        model: customModel?.trim() || "nvidia/nemotron-3-ultra-550b-a55b",
+      };
+    }
+
     if (isNvidia) {
       return {
         provider: "nvidia",
         apiKey: key,
         url: "https://integrate.api.nvidia.com/v1/chat/completions",
-        model: "nvidia/llama-3.1-nemotron-70b-instruct",
+        model: customModel?.trim() || "nvidia/llama-3.1-nemotron-70b-instruct",
       };
     }
+
     return {
       provider: "gemini",
       apiKey: key,
       url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-      model: "gemini-2.5-flash-lite",
+      model: customModel?.trim() || "gemini-2.5-flash-lite",
     };
   }
 

@@ -250,13 +250,14 @@ export const simplifySentencesBatch = createServerFn({ method: "POST" })
 
 const TestInput = z.object({
   key: z.string().min(5),
-  provider: z.enum(["nvidia", "gemini"]),
+  provider: z.enum(["nvidia", "openrouter", "gemini"]),
+  model: z.string().optional(),
 });
 
 export const testAiKey = createServerFn({ method: "POST" })
   .validator((d: unknown) => TestInput.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url, model, provider } = getAiConfig(data.key, data.provider);
+    const { apiKey, url, model, provider } = getAiConfig(data.key, data.provider, data.model);
 
     const start = Date.now();
     const headers: Record<string, string> = {

@@ -20,6 +20,7 @@ export const Route = createFileRoute("/_app/profile")({
 
 const STORAGE_CUSTOM_KEY = "lafz_custom_ai_key";
 const STORAGE_CUSTOM_PROVIDER = "lafz_custom_ai_provider";
+const STORAGE_CUSTOM_MODEL = "lafz_custom_ai_model";
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -31,12 +32,12 @@ function ProfilePage() {
   const [testingKey, setTestingKey] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
-  const [selectedProvider, setSelectedProvider] = useState<"nvidia" | "gemini">(() => {
+  const [selectedProvider, setSelectedProvider] = useState<"nvidia" | "openrouter" | "gemini">(() => {
     try {
-      if (typeof window === "undefined") return "gemini";
-      return (localStorage.getItem(STORAGE_CUSTOM_PROVIDER) as "nvidia" | "gemini") || "gemini";
+      if (typeof window === "undefined") return "nvidia";
+      return (localStorage.getItem(STORAGE_CUSTOM_PROVIDER) as any) || "nvidia";
     } catch {
-      return "gemini";
+      return "nvidia";
     }
   });
 
@@ -46,6 +47,15 @@ function ProfilePage() {
       return localStorage.getItem(STORAGE_CUSTOM_KEY) || "";
     } catch {
       return "";
+    }
+  });
+
+  const [customModelInput, setCustomModelInput] = useState<string>(() => {
+    try {
+      if (typeof window === "undefined") return "nvidia/nemotron-3-ultra-550b-a55b";
+      return localStorage.getItem(STORAGE_CUSTOM_MODEL) || "nvidia/nemotron-3-ultra-550b-a55b";
+    } catch {
+      return "nvidia/nemotron-3-ultra-550b-a55b";
     }
   });
 
@@ -83,14 +93,16 @@ function ProfilePage() {
     if (!apiKeyInput.trim()) {
       localStorage.removeItem(STORAGE_CUSTOM_KEY);
       localStorage.removeItem(STORAGE_CUSTOM_PROVIDER);
+      localStorage.removeItem(STORAGE_CUSTOM_MODEL);
       setIsSaved(false);
       toast.success("Custom API key removed. Using default engine.");
       return;
     }
     localStorage.setItem(STORAGE_CUSTOM_KEY, apiKeyInput.trim());
     localStorage.setItem(STORAGE_CUSTOM_PROVIDER, selectedProvider);
+    localStorage.setItem(STORAGE_CUSTOM_MODEL, customModelInput.trim());
     setIsSaved(true);
-    toast.success(`Saved ${selectedProvider === "nvidia" ? "NVIDIA Nemotron" : "Google Gemini"} API key!`);
+    toast.success(`Saved ${selectedProvider.toUpperCase()} (${customModelInput.trim()}) key!`);
   };
 
   const handleTestKey = async () => {
@@ -105,6 +117,7 @@ function ProfilePage() {
         data: {
           key: apiKeyInput.trim(),
           provider: selectedProvider,
+          model: customModelInput.trim(),
         },
       });
       toast.success(
@@ -157,7 +170,7 @@ function ProfilePage() {
             <div>
               <p className="font-display font-semibold">AI Translation Engine</p>
               <p className="text-xs text-muted-foreground">
-                Configure your own NVIDIA Nemotron or Google Gemini API key
+                Configure your NVIDIA Nemotron, OpenRouter, or Gemini key
               </p>
             </div>
           </div>
@@ -170,47 +183,82 @@ function ProfilePage() {
 
         {/* Provider Tabs */}
         <div>
-          <Label className="text-xs font-semibold block mb-1.5">Select Engine</Label>
-          <div className="grid grid-cols-2 gap-2">
+          <Label className="text-xs font-semibold block mb-1.5">Select Provider</Label>
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={() => setSelectedProvider("nvidia")}
+              onClick={() => {
+                setSelectedProvider("nvidia");
+                if (!customModelInput || customModelInput.includes("gemini")) {
+                  setCustomModelInput("nvidia/llama-3.1-nemotron-70b-instruct");
+                }
+              }}
               className={cn(
-                "py-2.5 px-3 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-1 cursor-pointer",
+                "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                 selectedProvider === "nvidia"
                   ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-600/20"
                   : "bg-muted/30 text-muted-foreground border-border hover:text-foreground"
               )}
             >
-              <span className="font-bold flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5" /> NVIDIA Nemotron
-              </span>
-              <span className="text-[10px] opacity-85">Llama-3.1-Nemotron-70B</span>
+              <Zap className="w-3.5 h-3.5" />
+              <span className="font-bold text-[11px]">NVIDIA NIM</span>
             </button>
 
             <button
               type="button"
-              onClick={() => setSelectedProvider("gemini")}
+              onClick={() => {
+                setSelectedProvider("openrouter");
+                setCustomModelInput("nvidia/nemotron-3-ultra-550b-a55b");
+              }}
               className={cn(
-                "py-2.5 px-3 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-1 cursor-pointer",
+                "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
+                selectedProvider === "openrouter"
+                  ? "bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
+                  : "bg-muted/30 text-muted-foreground border-border hover:text-foreground"
+              )}
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span className="font-bold text-[11px]">OpenRouter</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedProvider("gemini");
+                setCustomModelInput("gemini-2.5-flash-lite");
+              }}
+              className={cn(
+                "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                 selectedProvider === "gemini"
                   ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
                   : "bg-muted/30 text-muted-foreground border-border hover:text-foreground"
               )}
             >
-              <span className="font-bold flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Google Gemini
-              </span>
-              <span className="text-[10px] opacity-85">Gemini 2.5 Flash Lite</span>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="font-bold text-[11px]">Gemini</span>
             </button>
           </div>
+        </div>
+
+        {/* Model ID Input */}
+        <div className="space-y-1.5">
+          <Label htmlFor="model-id" className="text-xs font-semibold">
+            Model Identifier
+          </Label>
+          <Input
+            id="model-id"
+            value={customModelInput}
+            onChange={(e) => setCustomModelInput(e.target.value)}
+            placeholder="e.g. nvidia/nemotron-3-ultra-550b-a55b"
+            className="h-10 text-sm font-mono"
+          />
         </div>
 
         {/* API Key Input */}
         <div className="space-y-1.5">
           <Label htmlFor="api-key" className="text-xs font-semibold flex items-center gap-1">
             <Key className="w-3.5 h-3.5 text-muted-foreground" />
-            {selectedProvider === "nvidia" ? "NVIDIA API Key" : "Google Gemini API Key"}
+            API Key
           </Label>
           <div className="relative">
             <Input
@@ -219,6 +267,8 @@ function ProfilePage() {
               placeholder={
                 selectedProvider === "nvidia"
                   ? "nvapi-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  : selectedProvider === "openrouter"
+                  ? "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                   : "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               }
               value={apiKeyInput}
@@ -237,11 +287,6 @@ function ProfilePage() {
               {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {selectedProvider === "nvidia"
-              ? "Get your key from https://build.nvidia.com/explore/discover"
-              : "Get your key from https://aistudio.google.com/app/apikey"}
-          </p>
         </div>
 
         {/* Action Buttons */}
