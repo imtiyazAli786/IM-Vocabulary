@@ -669,7 +669,7 @@ function ReviewPage() {
         className="relative touch-none select-none"
         style={{
           height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 15.5rem)",
-          minHeight: 360,
+          minHeight: 400,
         }}
       >
         {/* Swipe Hints */}
@@ -694,7 +694,7 @@ function ReviewPage() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="h-full w-full p-4 sm:p-6 flex flex-col items-center justify-center text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative"
+          className="h-full w-full p-3 sm:p-5 flex flex-col justify-start items-stretch text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative scrollbar-none"
           style={{
             transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
             opacity,
@@ -702,111 +702,79 @@ function ReviewPage() {
           }}
         >
           {!flipped ? (
-            /* FRONT OF CARD */
-            reviewMode === "cloze" && cloze ? (
-              <div className="space-y-3.5 max-w-md my-auto">
-                <div className="flex items-center justify-center gap-1.5">
-                  <span
-                    className={cn(
-                      "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
-                      REGISTER_CONFIG[spectrum.register]?.colorBadge || "bg-primary/10 text-primary"
-                    )}
-                  >
-                    {REGISTER_CONFIG[spectrum.register]?.label || "Context"}
-                  </span>
-                </div>
-                <p className="text-xl sm:text-2xl font-serif leading-relaxed px-2 text-foreground">
-                  "{cloze.masked}"
-                </p>
-                {primarySentence?.ur && (
-                  <p className="font-urdu text-xl sm:text-2xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
-                    {primarySentence.ur}
-                  </p>
-                )}
-                {current.part_of_speech && (
-                  <p className="text-xs text-muted-foreground italic font-mono">({current.part_of_speech})</p>
-                )}
-                <div className="pt-2">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
-                    <RotateCw className="w-3 h-3" /> Tap card to reveal word & spectrum
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-3 my-auto">
+            /* DEFAULT FRONT OF CARD: FULL USAGE SPECTRUM & MEANING */
+            <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-1">
+              {/* Category Badge & Pronunciation */}
+              <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
                 <span
                   className={cn(
-                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border inline-block",
-                    REGISTER_CONFIG[spectrum.register]?.colorBadge || "bg-primary/10 text-primary"
+                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
+                    CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
                   )}
                 >
-                  {REGISTER_CONFIG[spectrum.register]?.label}
+                  {CATEGORY_CONFIG[spectrum.category]?.label}
                 </span>
-                <p className="text-3xl sm:text-4xl font-display font-bold text-foreground">{current.word}</p>
-                {current.part_of_speech && (
-                  <p className="text-xs font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground inline-block">
-                    {current.part_of_speech}
-                  </p>
-                )}
-                <div className="pt-3">
-                  <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
-                    <RotateCw className="w-3 h-3" /> Tap card to reveal meaning & spectrum
-                  </p>
-                </div>
-              </div>
-            )
-          ) : (
-            /* BACK OF CARD */
-            <div className="space-y-3 w-full max-w-md my-auto">
-              <div className="flex items-center justify-center gap-2">
-                <p className="text-3xl sm:text-4xl font-display font-bold text-primary">
-                  {current.word}
-                </p>
+
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="w-8 h-8 rounded-full bg-muted/60"
+                  size="sm"
+                  className="h-7 px-2 text-xs rounded-full bg-muted/60 hover:bg-primary/10 text-foreground hover:text-primary gap-1"
                   onClick={(e) => {
                     e.stopPropagation();
                     speak(current.word);
                   }}
                   title="Pronounce word"
                 >
-                  <Volume2 className="w-4 h-4 text-foreground" />
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span className="text-[10px]">Audio</span>
                 </Button>
               </div>
 
+              {/* Headword */}
+              <div className="pt-0.5">
+                <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight">
+                  {current.word}
+                </p>
+              </div>
+
+              {/* One-Word Equivalents */}
               {(current.one_word_en || current.one_word_ur) && (
-                <div className="flex flex-wrap justify-center items-center gap-2">
+                <div className="flex flex-wrap justify-center items-center gap-1.5">
                   {current.one_word_en && (
-                    <span className="px-2.5 py-0.5 rounded-md bg-primary/10 text-primary text-sm font-semibold">
+                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-semibold">
                       = {current.one_word_en}
                     </span>
                   )}
                   {current.one_word_ur && (
                     <span
-                      className="px-2.5 py-0.5 rounded-md bg-primary/10 text-primary font-urdu text-lg font-medium"
+                      className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-urdu text-base sm:text-lg font-medium"
                       dir="rtl"
                     >
                       = {current.one_word_ur}
                     </span>
                   )}
+                  {current.part_of_speech && (
+                    <span className="text-[10px] text-muted-foreground italic font-mono">
+                      ({current.part_of_speech})
+                    </span>
+                  )}
                 </div>
               )}
 
+              {/* Urdu Definition */}
               {current.translation_ur && (
-                <p className="font-urdu text-xl sm:text-2xl text-foreground font-medium leading-relaxed" dir="rtl">
+                <p className="font-urdu text-lg sm:text-2xl text-foreground font-medium leading-relaxed px-1" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
 
-              {/* Formality Spectrum Component */}
+              {/* 3-Tier Usage Spectrum Bridge Component */}
               <FormalitySpectrum data={spectrum} headword={current.word} />
 
               {/* Sentence Audio & Phrasing */}
               {primarySentence?.en && (
-                <div className="p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
                       Example Dialogue
@@ -820,18 +788,63 @@ function ReviewPage() {
                         e.stopPropagation();
                         speak(primarySentence.en || "");
                       }}
+                      title="Pronounce sentence"
                     >
                       <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
                     </Button>
                   </div>
-                  <p className="text-xs sm:text-sm italic font-serif">"{primarySentence.en}"</p>
+                  <p className="text-xs sm:text-sm italic font-serif text-foreground">"{primarySentence.en}"</p>
                   {primarySentence.ur && (
-                    <p className="font-urdu text-sm text-right pt-0.5 leading-relaxed" dir="rtl">
+                    <p className="font-urdu text-xs sm:text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
                       {primarySentence.ur}
                     </p>
                   )}
                 </div>
               )}
+
+              <div className="pt-1">
+                <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
+                  <RotateCw className="w-3 h-3" /> Tap card to test recall (Cloze mode)
+                </p>
+              </div>
+            </div>
+          ) : (
+            /* BACK OF CARD: RECALL / CLOZE CHALLENGE */
+            <div className="space-y-3.5 max-w-md mx-auto my-auto py-2">
+              <div className="flex items-center justify-center gap-1.5">
+                <span
+                  className={cn(
+                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
+                    CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
+                  )}
+                >
+                  {CATEGORY_CONFIG[spectrum.category]?.label || "Recall Test"}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-muted/20 border border-border/70 space-y-2">
+                <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground text-center">
+                  Fill in the missing word
+                </p>
+                <p className="text-xl sm:text-2xl font-serif leading-relaxed px-2 text-foreground">
+                  "{cloze ? cloze.masked : `[ ${current.word} ]`}"
+                </p>
+                {primarySentence?.ur && (
+                  <p className="font-urdu text-xl sm:text-2xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
+                    {primarySentence.ur}
+                  </p>
+                )}
+              </div>
+
+              {current.part_of_speech && (
+                <p className="text-xs text-muted-foreground italic font-mono">Part of speech: ({current.part_of_speech})</p>
+              )}
+
+              <div className="pt-2">
+                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
+                  <RotateCw className="w-3 h-3" /> Tap to reveal word & spectrum
+                </p>
+              </div>
             </div>
           )}
         </Card>
