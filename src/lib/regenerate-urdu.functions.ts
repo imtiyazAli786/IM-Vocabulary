@@ -4,9 +4,21 @@ import { getAiConfig } from "@/lib/ai-config";
 
 const SYSTEM = `You translate English words to ONE simple, everyday Urdu word.
 Return ONLY compact JSON: {"ur":"<single urdu word>"}.
-Rules: must be VERY SIMPLE, common spoken Urdu a beginner or child instantly understands.
-NOT literary, NOT Arabic/Persian-heavy, NOT formal. Single word in Urdu script only.
-Examples: resilient → مضبوط (not مستحکم); concrete → ٹھوس (not محسوس); happy → خوش (not مسرور); big → بڑا (not عظیم); fast → تیز (not سریع).`;
+Rules:
+1. Must be VERY SIMPLE, common spoken Urdu that a beginner or child instantly understands (عام فہم اور روزمرہ بول چال).
+2. STRICTLY AVOID literary, archaic, formal, or Arabic/Persian-heavy words.
+3. Single word (or max 2-word phrase like "کم کرنا" / "شامل کرنا" / "باز رہنا") in Urdu script only.
+Examples:
+- stale → باسی (not پرانا/بوسیدہ)
+- refrain → رکنا (not اجتناب)
+- resilient → مضبوط (not مستحکم)
+- mitigate → کم کرنا (not تخفیف)
+- concrete → ٹھوس (not محسوس)
+- happy → خوش (not مسرور)
+- inquire → پوچھنا (not استفسار)
+- commence → شروع کرنا (not آغاز)
+- assist → مدد کرنا (not معاونت)
+- onboard → شامل کرنا (not تعینات)`;
 
 async function fetchOne(word: string, apiKey: string, url: string, model: string): Promise<string | null> {
   const res = await fetch(url, {
