@@ -150,3 +150,13 @@ export function extractFormalitySpectrum(wordObj: {
     informal: detectedCategory === 'daily-life' ? headword : '',
   };
 }
+
+/**
+ * Strips internal JSON metadata from user notes so only real human notes are displayed.
+ */
+export function cleanUserNotes(notes?: string | null): string {
+  if (!notes) return '';
+  const cleaned = notes.replace(/\{[\s\S]*?"(category|register)"[\s\S]*?\}/g, '').trim();
+  return cleaned;
+}
+

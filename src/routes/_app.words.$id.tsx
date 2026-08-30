@@ -38,6 +38,7 @@ import {
   FormalityRegister,
   REGISTER_CONFIG,
   extractFormalitySpectrum,
+  cleanUserNotes,
 } from "@/lib/formality";
 import { FormalitySpectrum } from "@/components/FormalitySpectrum";
 
@@ -492,12 +493,12 @@ function WordDetailPage() {
               </div>
             )}
 
-            {w.notes && (
+            {cleanUserNotes(w.notes) && (
               <div className="pt-3 border-t border-border/60 space-y-1">
                 <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
                   Notes
                 </p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{w.notes}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{cleanUserNotes(w.notes)}</p>
               </div>
             )}
           </Card>

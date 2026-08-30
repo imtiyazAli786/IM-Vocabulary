@@ -106,7 +106,7 @@ function AddWordPage() {
     try {
       const r = await enrich({ data: { word: form.word.trim() } });
 
-      let inferredType = form.type;
+      let inferredType = (r.type as WordType) || form.type || "word";
       if (form.type === "word" && form.word.trim().split(/\s+/).length > 1) {
         inferredType = "phrase";
       }
@@ -118,10 +118,10 @@ function AddWordPage() {
 
       if (r.examples && r.examples.length > 0) {
         setExamples(
-          r.examples.map((ex) => ({
+          r.examples.map((ex: { en: string; ur?: string }) => ({
             en: ex.en || "",
             ur: ex.ur || "",
-          })),
+          }))
         );
       } else if (r.example_en || r.example_ur) {
         setExamples([{ en: r.example_en || "", ur: r.example_ur || "" }]);
@@ -129,11 +129,10 @@ function AddWordPage() {
 
       const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
 
-      const spectrumMeta = JSON.stringify({
-        category: detectedCat,
-        formal: r.formal || r.formal_equivalent || (detectedCat === "news-reading" ? form.word.trim() : ""),
-        neutral: r.neutral || r.neutral_equivalent || (detectedCat === "workplace" ? form.word.trim() : ""),
-        informal: r.informal || r.spoken_equivalent || (detectedCat === "daily-life" ? form.word.trim() : ""),
+      setSpectrumBridge({
+        formal: r.formal || r.formal_equivalent || "",
+        neutral: r.neutral || r.neutral_equivalent || "",
+        informal: r.informal || r.spoken_equivalent || "",
       });
 
       setForm((f) => ({
@@ -148,7 +147,6 @@ function AddWordPage() {
         definition_en: f.definition_en || r.definition_en || "",
         translation_ur: f.translation_ur || r.translation_ur || "",
         collocationsInput: f.collocationsInput || generatedCollocations,
-        notes: f.notes ? `${f.notes}\n${spectrumMeta}` : spectrumMeta,
       }));
       toast.success("Filled with AI suggestions");
     } catch (e) {
@@ -174,6 +172,15 @@ function AddWordPage() {
       const validExamples = examples.filter((ex) => ex.en.trim().length > 0);
       const primaryExample = validExamples[0] || { en: "", ur: "" };
 
+      const spectrumMeta = JSON.stringify({
+        category: form.category,
+        formal: spectrumBridge.formal || (form.category === "news-reading" ? form.word.trim() : form.synonym.trim() || ""),
+        neutral: spectrumBridge.neutral || (form.category === "workplace" ? form.word.trim() : form.one_word_en.trim() || ""),
+        informal: spectrumBridge.informal || (form.category === "daily-life" ? form.word.trim() : ""),
+      });
+      const cleanUserNote = form.notes.trim();
+      const finalNotes = cleanUserNote ? `${spectrumMeta}\n${cleanUserNote}` : spectrumMeta;
+
       const { error } = await supabase.from("words").insert({
         user_id: userRes.user.id,
         word: form.word.trim(),
@@ -190,7 +197,7 @@ function AddWordPage() {
         examples: validExamples,
         tags: [form.category],
         collocations: parsedCollocations,
-        notes: form.notes.trim() || null,
+        notes: finalNotes || null,
       });
       if (error) throw error;
 
