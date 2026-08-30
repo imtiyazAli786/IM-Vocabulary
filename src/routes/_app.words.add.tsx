@@ -434,8 +434,8 @@ function AddWordPage() {
             </div>
           </div>
 
-          {/* 5. Context Example Sentences */}
-          <div className="space-y-3 pt-2 border-t border-border/60">
+          {/* 5. Context Example Sentences - Single Unified Card */}
+          <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-xs font-semibold">Context Example Sentences</Label>
@@ -449,45 +449,53 @@ function AddWordPage() {
                 size="sm"
                 onClick={addExample}
                 disabled={examples.length >= 4}
-                className="h-8 text-xs gap-1"
+                className="h-7 text-xs gap-1"
               >
-                <Plus className="w-3.5 h-3.5" /> Add sentence
+                <Plus className="w-3.5 h-3.5" /> Add
               </Button>
             </div>
 
-            {examples.map((ex, idx) => (
-              <div
-                key={idx}
-                className="p-3.5 rounded-xl border border-border/80 bg-muted/15 space-y-2 relative"
-              >
-                <div className="flex items-center justify-between text-xs text-muted-foreground font-semibold">
-                  <span>Dialogue #{idx + 1}</span>
-                  {examples.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeExample(idx)}
-                      className="text-destructive hover:opacity-80 p-1 cursor-pointer"
-                      title="Remove sentence"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+            {/* Single Compact Unified Card */}
+            <div className="rounded-xl border border-border bg-card divide-y divide-border/60 shadow-sm overflow-hidden">
+              {examples.map((ex, idx) => (
+                <div key={idx} className="p-3 space-y-1.5 hover:bg-muted/10 transition-colors">
+                  <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full bg-primary/10 text-primary flex items-center justify-center text-[10px] font-bold">
+                        {idx + 1}
+                      </span>
+                      Sentence #{idx + 1}
+                    </span>
+                    {examples.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeExample(idx)}
+                        className="text-destructive hover:opacity-80 p-0.5 cursor-pointer"
+                        title="Remove sentence"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Input
+                      placeholder="English example sentence..."
+                      value={ex.en}
+                      onChange={(e) => updateExample(idx, "en", e.target.value)}
+                      className="bg-background h-9 text-xs sm:text-sm"
+                    />
+                    <Input
+                      placeholder="آسان اور عام فہم اردو ترجمہ..."
+                      value={ex.ur}
+                      onChange={(e) => updateExample(idx, "ur", e.target.value)}
+                      className="bg-background h-9 font-urdu text-sm sm:text-base leading-normal"
+                      dir="rtl"
+                    />
+                  </div>
                 </div>
-                <Input
-                  placeholder="English example sentence..."
-                  value={ex.en}
-                  onChange={(e) => updateExample(idx, "en", e.target.value)}
-                  className="bg-card h-10 text-sm"
-                />
-                <Input
-                  placeholder="آسان اور عام فہم اردو ترجمہ..."
-                  value={ex.ur}
-                  onChange={(e) => updateExample(idx, "ur", e.target.value)}
-                  className="bg-card h-10 font-urdu text-base leading-normal"
-                  dir="rtl"
-                />
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* 6. Optional Notes */}
