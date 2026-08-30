@@ -13,6 +13,7 @@ CRITICAL SENSE SELECTION & ACCURACY RULES:
 1. PRIMARY MODERN REAL-WORLD USAGE SENSE:
    - Always choose the MOST COMMON, PREVALENT REAL-WORLD CONVERSATIONAL & WORKPLACE SENSE in modern everyday English.
    - Disambiguate multiple dictionary meanings by choosing the sense people actually use in daily work and life:
+     * "reassignment" → assigning a new role, duty, or task ("نئی ذمہ داری" / "نیا کام"), NOT geographical transfer ("تبادلہ").
      * "overwhelm" → feeling overloaded/swamped by work, stress, or emotions ("پریشان کرنا" / "دباؤ ڈالنا" / "حاوی ہونا"), NEVER battlefield defeat ("ہرا دینا").
      * "render" → to make/cause to become ("بنا دینا" / "کر دینا").
      * "dismiss" → reject an idea or remove from job ("رد کرنا" / "فارغ کرنا").
@@ -25,10 +26,10 @@ CRITICAL SENSE SELECTION & ACCURACY RULES:
    - Use simple words that any native Urdu speaker, beginner, or student understands immediately.
    - STRICTLY AVOID heavy, archaic, academic, literary, or Persian/Arabic-heavy vocabulary.
    - ❌ AVOID: "استفسار", "معاونت", "مسرت", "تحیر", "مستعد", "استقامت", "ادراک", "تنازعہ", "کوششِ بسیار", "محسوس" (for tangible), "سریع", "اجتناب", "تخفیف", "مغلوبیت"
-   - ✅ USE: "پوچھنا", "مدد", "خوشی", "حیرانی", "تیار", "مضبوط رہنا", "سمجھنا", "جھگڑا", "بڑی کوشش", "ٹھوس", "تیز", "رکنا / باز رہنا", "کم کرنا", "پریشان کرنا", "شامل کرنا"
-4. ONE-WORD EQUIVALENTS:
-   - one_word_en: A SINGLE clean everyday English word/synonym.
-   - one_word_ur: The SINGLE most accurate, natural everyday Urdu word/phrase (1 to 2 words max in Urdu script, e.g. "پریشان کرنا", "باسی", "مضبوط", "کم کرنا", "شامل کرنا").
+   - ✅ USE: "پوچھنا", "مدد", "خوشی", "حیرانی", "تیار", "مضبوط رہنا", "سمجھنا", "جھگڑا", "بڑی کوشش", "ٹھوس", "تیز", "رکنا / باز رہنا", "کم کرنا", "پریشان کرنا", "شامل کرنا", "نئی ذمہ داری"
+4. NATURAL CONCISE URDU EQUIVALENT (one_word_ur):
+   - Provide the most concise, natural everyday Urdu equivalent (1 to 2 words max, e.g. "نئی ذمہ داری", "باسی", "مضبوط", "کم کرنا", "شامل کرنا", "نیا کام").
+   - Prefer natural conversational accuracy (e.g. "نئی ذمہ داری" for reassignment) rather than forcing an unnatural single word (like "تبادلہ").
 5. URDU DEFINITION (translation_ur):
    - A short, crystal-clear explanation in 1 conversational Urdu sentence (max 15 words).
 
@@ -48,8 +49,8 @@ Given an English word, return ONLY compact JSON with these keys:
 - neutral: office / workplace / standard everyday equivalent
 - formal: newspaper / editorial / formal equivalent
 - part_of_speech: noun, verb, adjective, adverb, phrase, etc.
-- one_word_en: a SINGLE common English word that means the same (just one word).
-- one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word (e.g. "باسی", "رکنا", "مضبوط", "پریشان کرنا").
+- one_word_en: a SINGLE common English word or concise phrase that means the same.
+- one_word_ur: concise, natural everyday Urdu equivalent (1 to 2 words in Urdu script, e.g. "نئی ذمہ داری", "باسی", "مضبوط", "کم کرنا").
 - synonym: ONE common English synonym.
 - antonym: ONE common English antonym.
 - definition_en: a simple, clear definition in plain English.
