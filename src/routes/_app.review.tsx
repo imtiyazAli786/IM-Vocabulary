@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   FormalityRegister,
+  PermanentCategory,
+  CATEGORY_CONFIG,
   REGISTER_CONFIG,
   extractFormalitySpectrum,
 } from "@/lib/formality";
