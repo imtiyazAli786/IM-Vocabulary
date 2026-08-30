@@ -389,31 +389,100 @@ function ReviewPage() {
   if (isFinished) {
     return (
       <div className="space-y-4 max-w-xl mx-auto pb-6">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-display font-semibold">Review</h1>
-          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
-            <button
-              type="button"
-              onClick={() => updateDeckType("all")}
-              className={cn(
-                "px-2.5 py-1 rounded-md font-medium transition-colors",
-                deckType === "all" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              All Library
-            </button>
-            <button
-              type="button"
-              onClick={() => updateDeckType("due")}
-              className={cn(
-                "px-2.5 py-1 rounded-md font-medium transition-colors",
-                deckType === "due" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-              )}
-            >
-              Due Only
-            </button>
+        <header className="flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-display font-semibold">Review</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {sessionReviewed > 0
+                ? `${sessionReviewed} cards reviewed in this session`
+                : "No cards pending in this deck"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <UpgradeFormalityModal />
+            <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => updateDeckType("all")}
+                className={cn(
+                  "px-2.5 py-1 rounded-md font-medium transition-colors",
+                  deckType === "all" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => updateDeckType("due")}
+                className={cn(
+                  "px-2.5 py-1 rounded-md font-medium transition-colors",
+                  deckType === "due" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
+                )}
+              >
+                Due
+              </button>
+            </div>
           </div>
         </header>
+
+        {/* 3 Permanent Situation Category Filter Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
+          <button
+            type="button"
+            onClick={() => updateSelectedCategory("all")}
+            className={cn(
+              "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              selectedCategory === "all"
+                ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            All ({categoryCounts.all})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updateSelectedCategory("daily-life")}
+            className={cn(
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              selectedCategory === "daily-life"
+                ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            <span>🏠 Daily Life</span>
+            <span className="text-[10px] opacity-75 font-mono">({categoryCounts["daily-life"]})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updateSelectedCategory("workplace")}
+            className={cn(
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              selectedCategory === "workplace"
+                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            <span>💼 Workplace</span>
+            <span className="text-[10px] opacity-75 font-mono">({categoryCounts.workplace})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updateSelectedCategory("news-reading")}
+            className={cn(
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              selectedCategory === "news-reading"
+                ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+                : "bg-card text-muted-foreground border-border hover:text-foreground"
+            )}
+          >
+            <span>📰 News Reading</span>
+            <span className="text-[10px] opacity-75 font-mono">({categoryCounts["news-reading"]})</span>
+          </button>
+        </div>
 
         <Card className="p-8 sm:p-10 text-center shadow-card rounded-2xl space-y-4">
           <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center mx-auto text-success">
@@ -426,7 +495,7 @@ function ReviewPage() {
             <p className="text-sm text-muted-foreground mt-1.5">
               {sessionReviewed > 0
                 ? `You reviewed ${sessionReviewed} word${sessionReviewed > 1 ? "s" : ""} in this session.`
-                : "No cards pending in this deck."}
+                : "No cards pending in this category."}
             </p>
           </div>
 
@@ -861,10 +930,15 @@ async function updateStreak(userId: string | null) {
     .select("current_streak,longest_streak,last_study_date")
     .eq("id", userId)
     .maybeSingle();
-  const today = new Date().toISOString().slice(0, 10);
+
+  const now = new Date();
+  const today = now.toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
   if (prof?.last_study_date === today) return;
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  const yesterdayDate = new Date(Date.now() - 86400000);
+  const yesterday = yesterdayDate.toLocaleDateString("en-CA");
   const streak = prof?.last_study_date === yesterday ? (prof.current_streak ?? 0) + 1 : 1;
+
   await supabase
     .from("profiles")
     .update({

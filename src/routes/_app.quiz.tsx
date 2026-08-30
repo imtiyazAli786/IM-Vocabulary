@@ -75,7 +75,8 @@ function buildQuiz(words: Word[]): Question[] {
       return { type, word: w, answer, options: shuffle([answer, ...distractors]) };
     }
     const answer = w.word;
-    const prompt = w.example_en!.replace(new RegExp(w.word, "i"), "_____");
+    const escaped = w.word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const prompt = w.example_en!.replace(new RegExp(escaped, "i"), "_____");
     const distractors = pickDistractors(allEn, answer, 3);
     return { type: "fill", word: w, answer, prompt, options: shuffle([answer, ...distractors]) };
   });

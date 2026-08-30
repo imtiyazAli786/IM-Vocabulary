@@ -37,7 +37,7 @@ Given raw text from a user's vocabulary document, extract every vocabulary word/
 Return ONLY valid JSON matching {"entries": [...]}. Infer missing fields when possible.`;
 
 export const parseVocabularyDocument = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => Input.parse(d))
+  .validator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
     const { apiKey, url } = getAiConfig();
     const fallbackModels = [

@@ -12,6 +12,7 @@ import { ArrowLeft, Upload, FileText, Check, Loader2, Save, X, Database } from "
 import { toast } from "sonner";
 import mammoth from "mammoth";
 import { TYPE_COLORS, formatType } from "@/lib/constants";
+import { normalizeCategory, PermanentCategory } from "@/lib/formality";
 
 export const Route = createFileRoute("/_app/import")({
   component: ImportPage,
@@ -22,6 +23,11 @@ interface ParsedEntry {
   word: string;
   type?: "word" | "phrase" | "connector" | "idiom" | "tense_pattern";
   part_of_speech?: string;
+  category?: PermanentCategory | string;
+  register?: string;
+  formal_equivalent?: string;
+  neutral_equivalent?: string;
+  spoken_equivalent?: string;
   one_word_en?: string;
   one_word_ur?: string;
   synonym?: string;
@@ -81,10 +87,14 @@ function ImportPage() {
         const result = await parseDoc({ data: { text } });
         const parsed: ParsedEntry[] = result.entries
           .filter((e): e is typeof e & { word: string } => !!e.word?.trim())
-          .map((e) => ({
+          .map((e: any) => ({
             word: e.word!.trim(),
-            // CQ-7: map type field from AI-parsed result
             type: e.type as ParsedEntry["type"] | undefined,
+            category: normalizeCategory(e.category || e.register),
+            register: e.register || e.category,
+            formal_equivalent: e.formal_equivalent || e.formal,
+            neutral_equivalent: e.neutral_equivalent || e.neutral,
+            spoken_equivalent: e.spoken_equivalent || e.informal,
             part_of_speech: e.part_of_speech,
             one_word_en: e.one_word_en,
             one_word_ur: e.one_word_ur,
@@ -204,17 +214,15 @@ function ImportPage() {
       };
 
       const rows = deduplicated.map((e) => {
-        const reg = (e.register || "").toLowerCase().trim();
-        const registerTag = ["formal", "neutral", "informal"].includes(reg) ? [reg] : [];
+        const cat = normalizeCategory(e.category || e.register);
+        const tags = [cat];
 
-        const spectrumMeta = reg
-          ? JSON.stringify({
-              register: reg,
-              formal: e.formal_equivalent || (reg === "formal" ? e.word.trim() : ""),
-              neutral: e.neutral_equivalent || (reg === "neutral" ? e.word.trim() : ""),
-              informal: e.spoken_equivalent || (reg === "informal" ? e.word.trim() : ""),
-            })
-          : "";
+        const spectrumMeta = JSON.stringify({
+          category: cat,
+          formal: e.formal_equivalent || (cat === "news-reading" ? e.word.trim() : ""),
+          neutral: e.neutral_equivalent || (cat === "workplace" ? e.word.trim() : ""),
+          informal: e.spoken_equivalent || (cat === "daily-life" ? e.word.trim() : ""),
+        });
 
         return {
           user_id: userRes.user.id,
@@ -230,7 +238,7 @@ function ImportPage() {
           example_en: e.example_en?.trim() || null,
           example_ur: e.example_ur?.trim() || null,
           examples: e.example_en?.trim() ? [{ en: e.example_en.trim(), ur: e.example_ur?.trim() || "" }] : [],
-          tags: registerTag,
+          tags,
           collocations: [] as string[],
           notes: spectrumMeta ? (e.notes ? `${spectrumMeta}\n${e.notes}` : spectrumMeta) : (e.notes?.trim() || null),
         };

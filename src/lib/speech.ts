@@ -5,11 +5,17 @@ import { toast } from "sonner";
  * Falls back to a toast error if speech synthesis is unavailable.
  */
 export function speak(text: string, lang = "en-US"): void {
+  if (typeof window === "undefined" || !text || !text.trim()) return;
   if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang;
-    window.speechSynthesis.speak(u);
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.trim());
+      u.lang = lang;
+      u.rate = 0.95;
+      window.speechSynthesis.speak(u);
+    } catch (e) {
+      console.warn("Speech synthesis error:", e);
+    }
   } else {
     toast.error("Speech synthesis not supported in this browser");
   }

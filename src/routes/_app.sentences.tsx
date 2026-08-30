@@ -35,11 +35,14 @@ export const Route = createFileRoute("/_app/sentences")({
   head: () => ({ meta: [{ title: "Sentence Cards — Lafz" }] }),
 });
 
+import { extractFormalitySpectrum, PermanentCategory, CATEGORY_CONFIG } from "@/lib/formality";
+
 interface SentenceEntry {
   id: string;
   wordId: string;
   word: string;
   type: string;
+  category: PermanentCategory;
   tags: string[];
   en: string;
   ur?: string;
@@ -70,8 +73,8 @@ function SentencesPage() {
   // View mode: 'cards' (immersive swipe player) or 'list' (browsing)
   const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
   const [filterMode, setFilterMode] = useState<"all" | "remaining" | "mastered">("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | PermanentCategory>("all");
   const [searchQ, setSearchQ] = useState("");
-  const [selectedTag, setSelectedTag] = useState("");
   const [clozeMode, setClozeMode] = useState(false);
   const [showUrdu, setShowUrdu] = useState(true);
 
@@ -100,7 +103,7 @@ function SentencesPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("words")
-        .select("id,word,type,tags,example_en,example_ur,examples")
+        .select("id,word,type,tags,notes,example_en,example_ur,examples")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -116,6 +119,8 @@ function SentencesPage() {
 
     words.forEach((w) => {
       const tags = Array.isArray(w.tags) ? w.tags : [];
+      const spectrum = extractFormalitySpectrum(w);
+      const cat = spectrum.category;
       let added = false;
 
       if (Array.isArray(w.examples) && w.examples.length > 0) {
@@ -126,6 +131,7 @@ function SentencesPage() {
               wordId: w.id,
               word: w.word,
               type: w.type || "word",
+              category: cat,
               tags,
               en: ex.en.trim(),
               ur: ex.ur?.trim() || "",
@@ -142,6 +148,7 @@ function SentencesPage() {
             wordId: w.id,
             word: w.word,
             type: w.type || "word",
+            category: cat,
             tags,
             en: w.example_en.trim(),
             ur: w.example_ur?.trim() || "",
@@ -153,19 +160,21 @@ function SentencesPage() {
     return list;
   }, [words]);
 
-  // Unique tags
-  const tagsList = useMemo(() => {
-    const set = new Set<string>();
-    allSentences.forEach((s) => s.tags.forEach((t) => t && set.add(t.toLowerCase())));
-    return Array.from(set).sort();
+  // Calculate situation category counts
+  const categoryCounts = useMemo(() => {
+    const counts = { all: allSentences.length, "daily-life": 0, workplace: 0, "news-reading": 0 };
+    allSentences.forEach((s) => {
+      counts[s.category] = (counts[s.category] || 0) + 1;
+    });
+    return counts;
   }, [allSentences]);
 
-  // Filtered sentences based on tag, search, and mastery status
+  // Filtered sentences based on category, search, and mastery status
   const filtered = useMemo(() => {
     return allSentences.filter((s) => {
       if (filterMode === "mastered" && !masteredMap[s.id]) return false;
       if (filterMode === "remaining" && masteredMap[s.id]) return false;
-      if (selectedTag && !s.tags.includes(selectedTag.toLowerCase())) return false;
+      if (selectedCategory !== "all" && s.category !== selectedCategory) return false;
       if (searchQ.trim()) {
         const q = searchQ.trim().toLowerCase();
         const matchesEn = s.en.toLowerCase().includes(q);
@@ -175,7 +184,7 @@ function SentencesPage() {
       }
       return true;
     });
-  }, [allSentences, filterMode, selectedTag, searchQ, masteredMap]);
+  }, [allSentences, filterMode, selectedCategory, searchQ, masteredMap]);
 
   // Auto-resume from last saved position once data loads
   useEffect(() => {
@@ -552,6 +561,76 @@ function SentencesPage() {
         </Button>
       </div>
 
+      {/* 3 Permanent Situation Category Filter Bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none text-xs">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("all");
+            setCurrentIndex(0);
+          }}
+          className={cn(
+            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedCategory === "all"
+              ? "bg-primary text-primary-foreground border-primary shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          All ({categoryCounts.all})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("daily-life");
+            setCurrentIndex(0);
+          }}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedCategory === "daily-life"
+              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>🏠 Daily Life</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts["daily-life"]})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("workplace");
+            setCurrentIndex(0);
+          }}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedCategory === "workplace"
+              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>💼 Workplace</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts.workplace})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCategory("news-reading");
+            setCurrentIndex(0);
+          }}
+          className={cn(
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            selectedCategory === "news-reading"
+              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
+              : "bg-card text-muted-foreground border-border hover:text-foreground"
+          )}
+        >
+          <span>📰 News Reading</span>
+          <span className="text-[10px] opacity-75 font-mono">({categoryCounts["news-reading"]})</span>
+        </button>
+      </div>
+
       {/* ─────────────────────────────────────────────────────────────
           MODE A: INTERACTIVE SWIPE CARDS (DEFAULT)
          ───────────────────────────────────────────────────────────── */}
@@ -573,6 +652,7 @@ function SentencesPage() {
               size="sm"
               onClick={() => {
                 setFilterMode("all");
+                setSelectedCategory("all");
                 setCurrentIndex(0);
               }}
             >
@@ -595,7 +675,7 @@ function SentencesPage() {
 
             {/* Main Interactive Swipe Card */}
             <Card className="p-6 sm:p-8 shadow-elevated border-border bg-card rounded-2xl min-h-[340px] flex flex-col justify-between relative transition-all">
-              {/* Card Header: Headword, Type, Tags, TTS */}
+              {/* Card Header: Headword, Type, Category Badge, TTS */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -609,14 +689,14 @@ function SentencesPage() {
                       <span>{currentSentence.word}</span>
                       <ArrowRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
                     </button>
-                    {currentSentence.tags.slice(0, 2).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium"
-                      >
-                        #{tag}
-                      </span>
-                    ))}
+                    <span
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full border font-semibold",
+                        CATEGORY_CONFIG[currentSentence.category]?.colorBadge || "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {CATEGORY_CONFIG[currentSentence.category]?.shortLabel || "Category"}
+                    </span>
                   </div>
 
                   <Button
@@ -781,14 +861,14 @@ function SentencesPage() {
                           <span>{s.word}</span>
                           <ArrowRight className="w-3.5 h-3.5 opacity-60" />
                         </button>
-                        {s.tags.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag}
-                            className="text-[10px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-medium"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.2 rounded border font-semibold",
+                            CATEGORY_CONFIG[s.category]?.colorBadge || "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {CATEGORY_CONFIG[s.category]?.shortLabel || "Category"}
+                        </span>
                       </div>
 
                       <div className="flex items-center gap-1">
