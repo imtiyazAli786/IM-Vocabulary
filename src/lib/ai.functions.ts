@@ -259,19 +259,22 @@ export const testAiKey = createServerFn({ method: "POST" })
     const { apiKey, url, model, provider } = getAiConfig(data.key, data.provider);
 
     const start = Date.now();
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    };
+
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers,
       body: JSON.stringify({
         model,
         messages: [
-          { role: "system", content: "You are a bilingual translator. Return ONLY a JSON object: {\"status\": \"ok\", \"sample\": \"مضبوط\"}" },
-          { role: "user", content: "Test query: resilient" },
+          { role: "user", content: "Reply with ONLY the word: Connected" },
         ],
-        response_format: { type: "json_object" },
+        temperature: 0.2,
+        max_tokens: 32,
       }),
     });
 
@@ -279,7 +282,22 @@ export const testAiKey = createServerFn({ method: "POST" })
 
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`Connection failed (${res.status}): ${err.slice(0, 200)}`);
+      let errorDetail = err;
+      try {
+        const parsed = JSON.parse(err);
+        if (parsed.detail) errorDetail = parsed.detail;
+        else if (parsed.message) errorDetail = parsed.message;
+        else if (parsed.error?.message) errorDetail = parsed.error.message;
+      } catch {
+        // use raw text
+      }
+
+      if (res.status === 403) {
+        throw new Error(
+          `NVIDIA API Key 403 (Forbidden): The key is invalid, expired, or has no remaining credits on build.nvidia.com. Please generate a new key at https://build.nvidia.com.`
+        );
+      }
+      throw new Error(`Connection failed (${res.status}): ${errorDetail.slice(0, 150)}`);
     }
 
     const j = await res.json();
