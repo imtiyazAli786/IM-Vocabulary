@@ -670,8 +670,9 @@ function ReviewPage() {
       <div
         className="relative touch-none select-none"
         style={{
-          height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 15.5rem)",
-          minHeight: 400,
+          height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18rem)",
+          minHeight: 340,
+          maxHeight: 520,
         }}
       >
         {/* Swipe Hints */}
@@ -696,7 +697,7 @@ function ReviewPage() {
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="h-full w-full p-3 sm:p-5 flex flex-col justify-start items-stretch text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative scrollbar-none"
+          className="h-full w-full p-3.5 sm:p-4.5 flex flex-col justify-start items-stretch text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative scrollbar-none"
           style={{
             transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
             opacity,
@@ -705,7 +706,7 @@ function ReviewPage() {
         >
           {!flipped ? (
             /* DEFAULT FRONT OF CARD: FULL USAGE SPECTRUM & MEANING */
-            <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-1">
+            <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-0.5">
               {/* Category Badge & Pronunciation */}
               <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
                 <span
@@ -740,24 +741,24 @@ function ReviewPage() {
                 </p>
               </div>
 
-              {/* One-Word Equivalents */}
-              {(current.one_word_en || current.one_word_ur) && (
-                <div className="flex flex-wrap justify-center items-center gap-1.5">
+              {/* One-Word Equivalents & Part of Speech */}
+              {(current.one_word_en || current.one_word_ur || current.part_of_speech) && (
+                <div className="flex flex-wrap justify-center items-center gap-1.5 pt-0.5">
                   {current.one_word_en && (
-                    <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary text-xs sm:text-sm font-semibold">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold h-6">
                       = {current.one_word_en}
                     </span>
                   )}
                   {current.one_word_ur && (
                     <span
-                      className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-urdu text-base sm:text-lg font-medium"
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-urdu text-sm font-medium h-6 leading-none"
                       dir="rtl"
                     >
-                      = {current.one_word_ur}
+                      {current.one_word_ur}
                     </span>
                   )}
                   {current.part_of_speech && (
-                    <span className="text-[10px] text-muted-foreground italic font-mono">
+                    <span className="inline-flex items-center text-[11px] text-muted-foreground italic font-mono px-1 h-6">
                       ({current.part_of_speech})
                     </span>
                   )}
@@ -766,7 +767,7 @@ function ReviewPage() {
 
               {/* Urdu Definition */}
               {current.translation_ur && (
-                <p className="font-urdu text-lg sm:text-xl text-foreground font-medium leading-relaxed px-1" dir="rtl">
+                <p className="font-urdu text-base sm:text-lg text-foreground font-medium leading-normal px-2 pt-0.5" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
@@ -804,7 +805,7 @@ function ReviewPage() {
                 </div>
               )}
 
-              <div className="pt-1">
+              <div className="pt-0.5">
                 <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
                   <RotateCw className="w-3 h-3" /> Tap card to test recall (Cloze mode)
                 </p>
@@ -812,7 +813,7 @@ function ReviewPage() {
             </div>
           ) : (
             /* BACK OF CARD: RECALL / CLOZE CHALLENGE */
-            <div className="space-y-3.5 max-w-md mx-auto my-auto py-2">
+            <div className="space-y-3 max-w-md mx-auto my-auto py-1">
               <div className="flex items-center justify-center gap-1.5">
                 <span
                   className={cn(
@@ -824,15 +825,15 @@ function ReviewPage() {
                 </span>
               </div>
 
-              <div className="p-4 rounded-xl bg-muted/20 border border-border/70 space-y-2">
+              <div className="p-3.5 rounded-xl bg-muted/20 border border-border/70 space-y-2">
                 <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground text-center">
                   Fill in the missing word
                 </p>
-                <p className="text-lg sm:text-xl font-serif leading-relaxed px-2 text-foreground">
+                <p className="text-base sm:text-lg font-serif leading-relaxed px-2 text-foreground">
                   "{cloze ? cloze.masked : `[ ${current.word} ]`}"
                 </p>
                 {primarySentence?.ur && (
-                  <p className="font-urdu text-lg sm:text-xl text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
+                  <p className="font-urdu text-base sm:text-lg text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
                     {primarySentence.ur}
                   </p>
                 )}
@@ -842,7 +843,7 @@ function ReviewPage() {
                 <p className="text-xs text-muted-foreground italic font-mono">Part of speech: ({current.part_of_speech})</p>
               )}
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
                   <RotateCw className="w-3 h-3" /> Tap to reveal word & spectrum
                 </p>
@@ -853,7 +854,7 @@ function ReviewPage() {
       </div>
 
       {/* Bottom Controls / SRS Rating Buttons */}
-      <div className="space-y-2 pt-1">
+      <div className="pt-1.5 pb-2">
         {flipped && !exiting ? (
           <div className="grid grid-cols-4 gap-2">
             <RateBtn
@@ -885,27 +886,24 @@ function ReviewPage() {
           <div className="grid grid-cols-3 gap-2">
             <Button
               variant="outline"
-              size="lg"
               disabled={idx === 0}
               onClick={() => setCardIndex(idx - 1)}
-              className="h-11 text-xs sm:text-sm font-medium"
+              className="h-10 text-xs sm:text-sm font-semibold shadow-sm cursor-pointer"
             >
               Previous
             </Button>
             <Button
               variant="default"
-              size="lg"
               onClick={() => setFlipped((f) => !f)}
-              className="h-11 text-xs sm:text-sm font-medium gap-1"
+              className="h-10 text-xs sm:text-sm font-semibold gap-1.5 shadow-sm cursor-pointer"
             >
               <RotateCw className="w-3.5 h-3.5" /> Flip Card
             </Button>
             <Button
               variant="outline"
-              size="lg"
               disabled={idx >= totalCount - 1}
               onClick={() => setCardIndex(idx + 1)}
-              className="h-11 text-xs sm:text-sm font-medium"
+              className="h-10 text-xs sm:text-sm font-semibold shadow-sm cursor-pointer"
             >
               Next
             </Button>
