@@ -735,31 +735,29 @@ function ReviewPage() {
               </div>
 
               {/* Headword */}
-              <div className="pt-0.5">
+              <div>
                 <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight">
                   {current.word}
                 </p>
               </div>
 
-              {/* One-Word Equivalents & Part of Speech */}
-              {(current.one_word_en || current.one_word_ur || current.part_of_speech) && (
-                <div className="flex flex-wrap justify-center items-center gap-1.5 pt-0.5">
+              {/* One-Word Quick Meanings (English & Urdu) - Symmetrical & Clean */}
+              {(current.one_word_en || current.one_word_ur) && (
+                <div className="flex items-center justify-center gap-2 pt-1 pb-0.5">
                   {current.one_word_en && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold h-6">
-                      = {current.one_word_en}
+                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs sm:text-sm font-semibold tracking-wide">
+                      {current.one_word_en}
                     </span>
+                  )}
+                  {current.one_word_en && current.one_word_ur && (
+                    <span className="text-muted-foreground/40 text-xs font-bold">•</span>
                   )}
                   {current.one_word_ur && (
                     <span
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-urdu text-sm font-medium h-6 leading-none"
+                      className="px-3 py-1 rounded-full bg-primary/10 text-primary font-urdu text-sm sm:text-base font-medium leading-none"
                       dir="rtl"
                     >
                       {current.one_word_ur}
-                    </span>
-                  )}
-                  {current.part_of_speech && (
-                    <span className="inline-flex items-center text-[11px] text-muted-foreground italic font-mono px-1 h-6">
-                      ({current.part_of_speech})
                     </span>
                   )}
                 </div>
@@ -767,7 +765,7 @@ function ReviewPage() {
 
               {/* Urdu Definition */}
               {current.translation_ur && (
-                <p className="font-urdu text-base sm:text-lg text-foreground font-medium leading-normal px-2 pt-0.5" dir="rtl">
+                <p className="font-urdu text-base sm:text-lg text-foreground font-medium leading-relaxed px-3 pt-1" dir="rtl">
                   {current.translation_ur}
                 </p>
               )}
