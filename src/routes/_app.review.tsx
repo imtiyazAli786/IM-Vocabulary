@@ -50,26 +50,6 @@ interface ExampleItem {
   ur?: string;
 }
 
-function maskWordInSentence(sentence: string, word: string): { masked: string; hasMatch: boolean } {
-  if (!sentence || !word) return { masked: sentence, hasMatch: false };
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`\\b${escaped}\\b`, "i");
-  if (regex.test(sentence)) {
-    return {
-      masked: sentence.replace(regex, "[ _______ ]"),
-      hasMatch: true,
-    };
-  }
-  const looseRegex = new RegExp(escaped, "i");
-  if (looseRegex.test(sentence)) {
-    return {
-      masked: sentence.replace(looseRegex, "[ _______ ]"),
-      hasMatch: true,
-    };
-  }
-  return { masked: sentence, hasMatch: false };
-}
-
 function ReviewPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -81,15 +61,6 @@ function ReviewPage() {
       return (localStorage.getItem(STORAGE_DECK_TYPE) as "due" | "all") || "all";
     } catch {
       return "all";
-    }
-  });
-
-  const [reviewMode, setReviewMode] = useState<"classic" | "cloze">(() => {
-    try {
-      if (typeof window === "undefined") return "cloze";
-      return (localStorage.getItem(STORAGE_MODE) as "classic" | "cloze") || "cloze";
-    } catch {
-      return "cloze";
     }
   });
 
@@ -110,7 +81,6 @@ function ReviewPage() {
 
   const [idx, setIdx] = useState<number>(0);
   const [hasResumed, setHasResumed] = useState(false);
-  const [flipped, setFlipped] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
 
   // Drag / swipe state
@@ -171,24 +141,15 @@ function ReviewPage() {
   const updateDeckType = (type: "due" | "all") => {
     setDeckType(type);
     setIdx(0);
-    setFlipped(false);
     try {
       localStorage.setItem(STORAGE_DECK_TYPE, type);
       localStorage.setItem(STORAGE_LAST_INDEX, "0");
     } catch {}
   };
 
-  const updateReviewMode = (mode: "classic" | "cloze") => {
-    setReviewMode(mode);
-    try {
-      localStorage.setItem(STORAGE_MODE, mode);
-    } catch {}
-  };
-
   const updateSelectedCategory = (cat: "all" | PermanentCategory) => {
     setSelectedCategory(cat);
     setIdx(0);
-    setFlipped(false);
     try {
       localStorage.setItem(STORAGE_REGISTER, cat);
       localStorage.setItem(STORAGE_LAST_INDEX, "0");
@@ -221,7 +182,6 @@ function ReviewPage() {
       if (!words || words.length === 0) return;
       const clamped = Math.max(0, Math.min(words.length - 1, newIdx));
       setIdx(clamped);
-      setFlipped(false);
       try {
         localStorage.setItem(STORAGE_LAST_INDEX, String(clamped));
       } catch {}
@@ -243,10 +203,6 @@ function ReviewPage() {
   }, [current]);
 
   const primarySentence = currentSentences[0];
-  const cloze = useMemo(() => {
-    if (!current || !primarySentence?.en) return null;
-    return maskWordInSentence(primarySentence.en, current.word);
-  }, [current, primarySentence]);
 
   const commitRating = async (rating: Rating) => {
     if (!current) return;
@@ -305,7 +261,6 @@ function ReviewPage() {
 
     window.setTimeout(() => {
       setSessionReviewed((r) => r + 1);
-      setFlipped(false);
       setDragY(0);
       setExiting(null);
 
@@ -323,7 +278,7 @@ function ReviewPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        setFlipped((f) => !f);
+        if (current?.word) speak(current.word);
       } else if (e.key === "ArrowUp" || e.key === "1") {
         e.preventDefault();
         advanceWith("good", "up");
@@ -341,7 +296,7 @@ function ReviewPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [idx, words, setCardIndex]);
+  }, [idx, words, current, setCardIndex]);
 
   // Touch pointer handlers for card swipe
   const onPointerDown = (e: React.PointerEvent) => {
@@ -368,7 +323,6 @@ function ReviewPage() {
 
     const dy = dragY;
     if (!moved.current) {
-      setFlipped((f) => !f);
       setDragY(0);
       return;
     }
@@ -704,197 +658,151 @@ function ReviewPage() {
             transition: dragging ? "none" : "transform 220ms ease, opacity 220ms ease",
           }}
         >
-          {!flipped ? (
-            /* DEFAULT FRONT OF CARD: FULL USAGE SPECTRUM & MEANING */
-            <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-0.5">
-              {/* Category Badge Bar */}
-              <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
-                <span
-                  className={cn(
-                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
-                    CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
-                  )}
-                >
-                  {CATEGORY_CONFIG[spectrum.category]?.label}
-                </span>
-
-                {current.one_word_en && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {current.one_word_en}
-                  </span>
+          {/* DEFAULT CARD DETAILS: FULL USAGE SPECTRUM & MEANING */}
+          <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-0.5">
+            {/* Category Badge Bar */}
+            <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
+              <span
+                className={cn(
+                  "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
+                  CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
                 )}
+              >
+                {CATEGORY_CONFIG[spectrum.category]?.label}
+              </span>
+
+              {current.one_word_en && (
+                <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {current.one_word_en}
+                </span>
+              )}
+            </div>
+
+            {/* Hero Row: English Word + Audio on Left, Urdu 1-Word on Right */}
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-2">
+                <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight text-left">
+                  {current.word}
+                </p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    speak(current.word);
+                  }}
+                  className="w-8 h-8 rounded-full bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-sm"
+                  title="Pronounce word"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Hero Row: English Word + Audio on Left, Urdu 1-Word on Right */}
-              <div className="flex items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight text-left">
-                    {current.word}
-                  </p>
-                  <button
+              {current.one_word_ur && (
+                <p className="font-urdu text-2xl sm:text-3xl font-bold text-primary leading-none text-right shrink-0" dir="rtl">
+                  {current.one_word_ur}
+                </p>
+              )}
+            </div>
+
+            {/* Urdu Definition */}
+            {current.translation_ur && (
+              <p className="font-urdu text-base sm:text-lg text-foreground/90 font-medium leading-relaxed px-1 text-right pt-0.5" dir="rtl">
+                {current.translation_ur}
+              </p>
+            )}
+
+            {/* 3-Tier Usage Spectrum Bridge Component */}
+            <FormalitySpectrum data={spectrum} headword={current.word} />
+
+            {/* Sentence Audio & Phrasing */}
+            {primarySentence?.en && (
+              <div className="p-2 sm:p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
+                    Example Dialogue
+                  </span>
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="w-5 h-5 rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      speak(current.word);
+                      speak(primarySentence.en || "");
                     }}
-                    className="w-8 h-8 rounded-full bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-sm"
-                    title="Pronounce word"
+                    title="Pronounce sentence"
                   >
-                    <Volume2 className="w-4 h-4" />
-                  </button>
+                    <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+                  </Button>
                 </div>
-
-                {current.one_word_ur && (
-                  <p className="font-urdu text-2xl sm:text-3xl font-bold text-primary leading-none text-right shrink-0" dir="rtl">
-                    {current.one_word_ur}
-                  </p>
-                )}
-              </div>
-
-              {/* Urdu Definition */}
-              {current.translation_ur && (
-                <p className="font-urdu text-base sm:text-lg text-foreground/90 font-medium leading-relaxed px-1 text-right pt-0.5" dir="rtl">
-                  {current.translation_ur}
-                </p>
-              )}
-
-              {/* 3-Tier Usage Spectrum Bridge Component */}
-              <FormalitySpectrum data={spectrum} headword={current.word} />
-
-              {/* Sentence Audio & Phrasing */}
-              {primarySentence?.en && (
-                <div className="p-2 sm:p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
-                      Example Dialogue
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="w-5 h-5 rounded-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        speak(primarySentence.en || "");
-                      }}
-                      title="Pronounce sentence"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Button>
-                  </div>
-                  <p className="text-xs sm:text-sm italic font-serif text-foreground">"{primarySentence.en}"</p>
-                  {primarySentence.ur && (
-                    <p className="font-urdu text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
-                      {primarySentence.ur}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              <div className="pt-0.5">
-                <p className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
-                  <RotateCw className="w-3 h-3" /> Tap card to test recall (Cloze mode)
-                </p>
-              </div>
-            </div>
-          ) : (
-            /* BACK OF CARD: RECALL / CLOZE CHALLENGE */
-            <div className="space-y-3 max-w-md mx-auto my-auto py-1">
-              <div className="flex items-center justify-center gap-1.5">
-                <span
-                  className={cn(
-                    "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
-                    CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
-                  )}
-                >
-                  {CATEGORY_CONFIG[spectrum.category]?.label || "Recall Test"}
-                </span>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-muted/20 border border-border/70 space-y-2">
-                <p className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground text-center">
-                  Fill in the missing word
-                </p>
-                <p className="text-base sm:text-lg font-serif leading-relaxed px-2 text-foreground">
-                  "{cloze ? cloze.masked : `[ ${current.word} ]`}"
-                </p>
-                {primarySentence?.ur && (
-                  <p className="font-urdu text-base sm:text-lg text-muted-foreground pt-0.5 leading-relaxed" dir="rtl">
+                <p className="text-xs sm:text-sm italic font-serif text-foreground">"{primarySentence.en}"</p>
+                {primarySentence.ur && (
+                  <p className="font-urdu text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
                     {primarySentence.ur}
                   </p>
                 )}
               </div>
-
-              {current.part_of_speech && (
-                <p className="text-xs text-muted-foreground italic font-mono">Part of speech: ({current.part_of_speech})</p>
-              )}
-
-              <div className="pt-1">
-                <p className="text-xs text-muted-foreground flex items-center justify-center gap-1.5 bg-muted/40 py-1 px-3 rounded-full mx-auto w-fit">
-                  <RotateCw className="w-3 h-3" /> Tap to reveal word & spectrum
-                </p>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </Card>
       </div>
 
-      {/* Bottom Controls / SRS Rating Buttons */}
-      <div className="pt-1.5 pb-2">
-        {flipped && !exiting ? (
-          <div className="grid grid-cols-4 gap-2">
-            <RateBtn
-              label="Again"
-              sub="< 10m"
-              color="bg-destructive text-destructive-foreground"
-              onClick={() => advanceWith("again", "down")}
-            />
-            <RateBtn
-              label="Hard"
-              sub="1d"
-              color="bg-warning text-warning-foreground"
-              onClick={() => advanceWith("hard", "down")}
-            />
-            <RateBtn
-              label="Good"
-              sub="3d+"
-              color="bg-primary text-primary-foreground"
-              onClick={() => advanceWith("good", "up")}
-            />
-            <RateBtn
-              label="Easy"
-              sub="long"
-              color="bg-success text-success-foreground"
-              onClick={() => advanceWith("easy", "up")}
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              variant="outline"
-              disabled={idx === 0}
-              onClick={() => setCardIndex(idx - 1)}
-              className="h-10 text-xs sm:text-sm font-semibold shadow-sm cursor-pointer"
-            >
-              Previous
-            </Button>
-            <Button
-              variant="default"
-              onClick={() => setFlipped((f) => !f)}
-              className="h-10 text-xs sm:text-sm font-semibold gap-1.5 shadow-sm cursor-pointer"
-            >
-              <RotateCw className="w-3.5 h-3.5" /> Flip Card
-            </Button>
-            <Button
-              variant="outline"
-              disabled={idx >= totalCount - 1}
-              onClick={() => setCardIndex(idx + 1)}
-              className="h-10 text-xs sm:text-sm font-semibold shadow-sm cursor-pointer"
-            >
-              Next
-            </Button>
-          </div>
-        )}
+      {/* Bottom Controls / SRS Rating & Navigation Buttons */}
+      <div className="space-y-2 pt-1 pb-2">
+        {/* Direct 4 SRS Rating Buttons */}
+        <div className="grid grid-cols-4 gap-2">
+          <RateBtn
+            label="Again"
+            sub="< 10m"
+            color="bg-destructive text-destructive-foreground"
+            onClick={() => advanceWith("again", "down")}
+          />
+          <RateBtn
+            label="Hard"
+            sub="1d"
+            color="bg-warning text-warning-foreground"
+            onClick={() => advanceWith("hard", "down")}
+          />
+          <RateBtn
+            label="Good"
+            sub="3d+"
+            color="bg-primary text-primary-foreground"
+            onClick={() => advanceWith("good", "up")}
+          />
+          <RateBtn
+            label="Easy"
+            sub="long"
+            color="bg-success text-success-foreground"
+            onClick={() => advanceWith("easy", "up")}
+          />
+        </div>
+
+        {/* Previous & Next Navigation Row */}
+        <div className="flex items-center justify-between gap-2 pt-0.5">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={idx === 0}
+            onClick={() => setCardIndex(idx - 1)}
+            className="h-8 text-xs font-semibold shadow-sm cursor-pointer"
+          >
+            ← Previous
+          </Button>
+
+          <span className="text-[11px] text-muted-foreground font-medium">
+            Swipe up (Good) · down (Again)
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={idx >= totalCount - 1}
+            onClick={() => setCardIndex(idx + 1)}
+            className="h-8 text-xs font-semibold shadow-sm cursor-pointer"
+          >
+            Next →
+          </Button>
+        </div>
       </div>
     </div>
   );
