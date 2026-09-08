@@ -10,12 +10,12 @@ const CACHE_KEY = "lafz-query-cache";
 const PERSIST_KEYS = new Set([
   "words",
   "word",
-  "review-queue",
+  "words-all-raw",
+  "review-words",
+  "words-sentences",
+  "dashboard",
   "quiz-words",
   "profile-stats",
-  "grammar-stats",
-  "practice-queue-due",
-  "practice-queue-recent",
 ]);
 
 export function useOfflineCache(queryClient: QueryClient) {

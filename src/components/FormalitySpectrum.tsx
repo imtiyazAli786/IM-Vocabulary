@@ -92,27 +92,34 @@ export function FormalitySpectrum({ data, headword, className }: FormalitySpectr
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
-                <span
-                  className={cn(
-                    "text-xs sm:text-sm font-medium tracking-tight",
-                    isActive ? "text-primary font-bold" : "text-foreground"
-                  )}
-                >
-                  {displayVal}
-                </span>
+                {(() => {
+                  const isUrdu = /[\u0600-\u06FF]/.test(displayVal);
+                  return (
+                    <span
+                      dir={isUrdu ? "rtl" : "ltr"}
+                      className={cn(
+                        isUrdu ? "font-urdu text-sm sm:text-base leading-[1.8]" : "text-xs sm:text-sm font-medium tracking-tight",
+                        isActive ? "text-primary font-bold" : "text-foreground"
+                      )}
+                    >
+                      {displayVal}
+                    </span>
+                  );
+                })()}
                 {displayVal !== "—" && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="w-5 h-5 rounded-full hover:bg-muted/80 p-0 text-muted-foreground hover:text-foreground"
+                    className="w-6 h-6 rounded-full hover:bg-muted/80 p-0 text-muted-foreground hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       speak(displayVal);
                     }}
                     title={`Pronounce ${displayVal}`}
+                    aria-label={`Pronounce ${displayVal}`}
                   >
-                    <Volume2 className="w-3 h-3" />
+                    <Volume2 className="w-3.5 h-3.5" />
                   </Button>
                 )}
               </div>

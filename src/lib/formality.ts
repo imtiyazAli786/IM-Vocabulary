@@ -18,6 +18,7 @@ export const CATEGORY_CONFIG: Record<
     colorBorder: string;
     colorBg: string;
     colorText: string;
+    colorActivePill: string;
     icon: string;
   }
 > = {
@@ -26,10 +27,11 @@ export const CATEGORY_CONFIG: Record<
     label: '🏠 Daily Life (Home, Friends, Shows)',
     shortLabel: '🏠 Daily Life',
     description: 'Home, family conversations, friends, reality shows & casual slang',
-    colorBadge: 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/20',
-    colorBorder: 'border-purple-500/40',
-    colorBg: 'bg-purple-500/5',
-    colorText: 'text-purple-700 dark:text-purple-300',
+    colorBadge: 'bg-purple-50 text-purple-800 dark:bg-purple-950/40 dark:text-purple-300 border-purple-200/80 dark:border-purple-800/60 font-medium',
+    colorBorder: 'border-purple-200',
+    colorBg: 'bg-purple-50/50',
+    colorText: 'text-purple-800 dark:text-purple-300',
+    colorActivePill: 'bg-purple-100 text-purple-900 border-purple-300 shadow-xs ring-1 ring-purple-400/20 font-semibold dark:bg-purple-900/50 dark:text-purple-100 dark:border-purple-700',
     icon: '🏠',
   },
   workplace: {
@@ -37,10 +39,11 @@ export const CATEGORY_CONFIG: Record<
     label: '💼 Workplace (Office, Meetings, Emails)',
     shortLabel: '💼 Workplace',
     description: 'Office environment, professional discussions, emails & meetings',
-    colorBadge: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
-    colorBorder: 'border-emerald-500/40',
-    colorBg: 'bg-emerald-500/5',
-    colorText: 'text-emerald-700 dark:text-emerald-300',
+    colorBadge: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-200/80 dark:border-emerald-800/60 font-medium',
+    colorBorder: 'border-emerald-200',
+    colorBg: 'bg-emerald-50/50',
+    colorText: 'text-emerald-800 dark:text-emerald-300',
+    colorActivePill: 'bg-emerald-100 text-emerald-900 border-emerald-300 shadow-xs ring-1 ring-emerald-400/20 font-semibold dark:bg-emerald-900/50 dark:text-emerald-100 dark:border-emerald-700',
     icon: '💼',
   },
   'news-reading': {
@@ -48,10 +51,11 @@ export const CATEGORY_CONFIG: Record<
     label: '📰 News Reading (Articles, Editorials)',
     shortLabel: '📰 News Reading',
     description: 'Newspaper articles, formal writing, serious essays & editorials',
-    colorBadge: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20',
-    colorBorder: 'border-sky-500/40',
-    colorBg: 'bg-sky-500/5',
-    colorText: 'text-sky-700 dark:text-sky-300',
+    colorBadge: 'bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300 border-sky-200/80 dark:border-sky-800/60 font-medium',
+    colorBorder: 'border-sky-200',
+    colorBg: 'bg-sky-50/50',
+    colorText: 'text-sky-800 dark:text-sky-300',
+    colorActivePill: 'bg-sky-100 text-sky-900 border-sky-300 shadow-xs ring-1 ring-sky-400/20 font-semibold dark:bg-sky-900/50 dark:text-sky-100 dark:border-sky-700',
     icon: '📰',
   },
 };

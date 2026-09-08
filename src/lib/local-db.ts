@@ -11,7 +11,10 @@ interface LocalDB {
   grammar_attempts: Record<string, any>[];
 }
 
+let _cachedDB: LocalDB | null = null;
+
 function getDB(): LocalDB {
+  if (_cachedDB) return _cachedDB;
   const defaults: LocalDB = {
     words: [],
     profiles: [],
@@ -41,15 +44,20 @@ function getDB(): LocalDB {
         });
         localStorage.setItem(DB_KEY, JSON.stringify(db));
       }
+      _cachedDB = db;
       return db;
     }
   } catch {}
+  _cachedDB = defaults;
   return defaults;
 }
 
 function saveDB(db: LocalDB) {
+  _cachedDB = db;
   if (typeof window !== "undefined") {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
+    try {
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+    } catch {}
   }
 }
 
@@ -367,6 +375,7 @@ function getGuestId() {
 }
 
 function clearGuestData() {
+  _cachedDB = null;
   try {
     if (typeof window !== "undefined") {
       localStorage.removeItem(GUEST_KEY);

@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { BookOpen, MessageSquareQuote, Layers, Trophy } from "lucide-react";
+import { BookOpen, MessageSquareQuote, Layers, Trophy, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -7,6 +7,7 @@ const nav = [
   { to: "/words", icon: BookOpen, label: "Words" },
   { to: "/sentences", icon: MessageSquareQuote, label: "Sentences" },
   { to: "/quiz", icon: Trophy, label: "Quiz" },
+  { to: "/profile", icon: User, label: "Profile" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -26,7 +27,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         className="fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-card/95 backdrop-blur-md shadow-lg"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="mx-auto max-w-xl grid grid-cols-4 px-2 py-1">
+        <div className="mx-auto max-w-xl grid grid-cols-5 px-1.5 py-1">
           {nav.map(({ to, icon: Icon, label }) => {
             const active = to === "/" ? loc.pathname === "/" : loc.pathname.startsWith(to);
             return (
@@ -34,6 +35,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={to}
                 to={to}
                 aria-label={label}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex flex-col items-center justify-center py-1 min-h-[54px] text-[11px] font-medium transition-all group rounded-xl",
                   active ? "text-primary" : "text-muted-foreground hover:text-foreground"

@@ -8,6 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import {
   Volume2,
   Tag,
   Sparkles,
@@ -16,6 +27,8 @@ import {
   EyeOff,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   RotateCcw,
   Layers,
@@ -97,6 +110,14 @@ function SentencesPage() {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
   const [hasResumed, setHasResumed] = useState(false);
 
+  // List view pagination
+  const [listPage, setListPage] = useState<number>(1);
+  const LIST_PAGE_SIZE = 40;
+
+  useEffect(() => {
+    setListPage(1);
+  }, [searchQ, filterMode, selectedCategory]);
+
   // Fetch words and sentences
   const { data: words, isLoading } = useQuery({
     queryKey: ["words-sentences"],
@@ -108,8 +129,8 @@ function SentencesPage() {
       if (error) throw error;
       return data ?? [];
     },
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
   });
 
   // Extract all sentences cleanly
@@ -207,9 +228,13 @@ function SentencesPage() {
     }
   }, [allSentences, hasResumed]);
 
+  // Safe clamped index to permanently prevent out-of-bounds crashes
+  const safeIndex = filtered.length > 0 ? Math.max(0, Math.min(currentIndex, filtered.length - 1)) : 0;
+
   // Save current position whenever it changes
   const setCardIndex = useCallback(
     (index: number) => {
+      if (filtered.length === 0) return;
       const clamped = Math.max(0, Math.min(filtered.length - 1, index));
       setCurrentIndex(clamped);
       try {
@@ -232,16 +257,16 @@ function SentencesPage() {
 
   // Card navigation helpers
   const nextCard = useCallback(() => {
-    if (currentIndex < filtered.length - 1) {
-      setCardIndex(currentIndex + 1);
+    if (safeIndex < filtered.length - 1) {
+      setCardIndex(safeIndex + 1);
     }
-  }, [currentIndex, filtered.length, setCardIndex]);
+  }, [safeIndex, filtered.length, setCardIndex]);
 
   const prevCard = useCallback(() => {
-    if (currentIndex > 0) {
-      setCardIndex(currentIndex - 1);
+    if (safeIndex > 0) {
+      setCardIndex(safeIndex - 1);
     }
-  }, [currentIndex, setCardIndex]);
+  }, [safeIndex, setCardIndex]);
 
   // Helper to persist simple Urdu update to Supabase & localStorage
   const updateWordSentenceUrdu = async (wordId: string, sentenceId: string, newUr: string) => {
@@ -293,7 +318,7 @@ function SentencesPage() {
 
   // Simplify single current sentence
   const handleSimplifyCurrent = async () => {
-    const current = filtered[currentIndex];
+    const current = filtered[safeIndex];
     if (!current || isSimplifying) return;
     setIsSimplifying(true);
     try {
@@ -423,12 +448,28 @@ function SentencesPage() {
     touchStartX.current = null;
   };
 
-  if (isLoading) return <LoadingScreen />;
+  if (isLoading && (!words || words.length === 0)) {
+    return (
+      <div className="space-y-3 pb-4 max-w-xl mx-auto">
+        <header className="flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-display font-semibold">Sentences</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Loading sentences…</p>
+          </div>
+        </header>
+        <div className="w-full p-8 rounded-2xl border border-border/70 bg-card/60 animate-pulse space-y-4">
+          <div className="h-6 bg-muted rounded w-28" />
+          <div className="h-12 bg-muted/70 rounded-xl w-full" />
+          <div className="h-8 bg-muted/40 rounded-xl w-3/4" />
+        </div>
+      </div>
+    );
+  }
 
   const totalCount = allSentences.length;
   const masteredCount = allSentences.filter((s) => masteredMap[s.id]).length;
   const remainingCount = totalCount - masteredCount;
-  const currentSentence = filtered[currentIndex];
+  const currentSentence = filtered[safeIndex] || null;
   const isCurrentMastered = currentSentence ? !!masteredMap[currentSentence.id] : false;
 
   return (
@@ -448,17 +489,34 @@ function SentencesPage() {
 
         {/* View mode & Simplify All buttons */}
         <div className="flex items-center gap-1.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSimplifyAll}
-            disabled={isBulkSimplifying || allSentences.length === 0}
-            className="h-7 px-2 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10 transition-colors"
-            title="Convert all sentences in your vocabulary to simple everyday Urdu"
-          >
-            <Sparkles className={cn("w-3 h-3", isBulkSimplifying && "animate-spin")} />
-            <span>{isBulkSimplifying ? "Simplifying…" : "Simplify All Urdu"}</span>
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isBulkSimplifying || allSentences.length === 0}
+                className="h-7 px-2 text-xs gap-1 text-primary border-primary/30 hover:bg-primary/10 transition-colors"
+                title="Convert all sentences in your vocabulary to simple everyday Urdu"
+              >
+                <Sparkles className={cn("w-3 h-3", isBulkSimplifying && "animate-spin")} />
+                <span>{isBulkSimplifying ? "Simplifying…" : "Simplify All Urdu"}</span>
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Simplify All Sentences?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will run AI simplification across all {allSentences.length} sentences in your vocabulary to translate them into clear, easy conversational Urdu.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSimplifyAll}>
+                  Start Simplification
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border">
             <Button
@@ -569,11 +627,12 @@ function SentencesPage() {
             setSelectedCategory("all");
             setCurrentIndex(0);
           }}
+          aria-pressed={selectedCategory === "all"}
           className={cn(
-            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "all"
-              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? "bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/20 font-semibold"
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           All ({categoryCounts.all})
@@ -585,11 +644,12 @@ function SentencesPage() {
             setSelectedCategory("daily-life");
             setCurrentIndex(0);
           }}
+          aria-pressed={selectedCategory === "daily-life"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "daily-life"
-              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG["daily-life"].colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>🏠 Daily Life</span>
@@ -602,11 +662,12 @@ function SentencesPage() {
             setSelectedCategory("workplace");
             setCurrentIndex(0);
           }}
+          aria-pressed={selectedCategory === "workplace"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "workplace"
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG.workplace.colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>💼 Workplace</span>
@@ -619,11 +680,12 @@ function SentencesPage() {
             setSelectedCategory("news-reading");
             setCurrentIndex(0);
           }}
+          aria-pressed={selectedCategory === "news-reading"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "news-reading"
-              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG["news-reading"].colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>📰 News Reading</span>
@@ -668,9 +730,9 @@ function SentencesPage() {
             {/* Card Index & Progress Pill */}
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Card {currentIndex + 1} of {filtered.length}
+                Card {safeIndex + 1} of {filtered.length}
               </span>
-              <span className="text-xs text-muted-foreground">Swipe up / down or use buttons</span>
+              <span className="text-xs text-muted-foreground">Swipe or use buttons</span>
             </div>
 
             {/* Main Interactive Swipe Card */}
@@ -684,7 +746,11 @@ function SentencesPage() {
                       onClick={() =>
                         navigate({ to: "/words/$id", params: { id: currentSentence.wordId } })
                       }
-                      className="inline-flex items-center gap-1.5 text-base font-bold text-primary hover:underline group"
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-base font-bold text-primary hover:underline group transition-all",
+                        clozeMode && "filter blur-sm hover:blur-none select-none"
+                      )}
+                      title={clozeMode ? "Target word hidden in Test Mode (Hover/Tap to peek)" : undefined}
                     >
                       <span>{currentSentence.word}</span>
                       <ArrowRight className="w-3.5 h-3.5 opacity-60 group-hover:translate-x-0.5 transition-transform" />
@@ -740,7 +806,7 @@ function SentencesPage() {
                   <button
                     type="button"
                     onClick={() => setShowUrdu((s) => !s)}
-                    className="text-xs text-primary font-medium hover:underline"
+                    className="text-xs text-primary font-medium hover:underline cursor-pointer"
                   >
                     {showUrdu ? "Hide" : "Reveal translation"}
                   </button>
@@ -757,7 +823,7 @@ function SentencesPage() {
                   <button
                     type="button"
                     onClick={() => setShowUrdu(true)}
-                    className="w-full py-4 text-center text-sm font-medium text-muted-foreground bg-muted/30 rounded-xl border border-dashed hover:bg-muted/50 transition-colors"
+                    className="w-full py-4 text-center text-sm font-medium text-muted-foreground bg-muted/30 rounded-xl border border-dashed hover:bg-muted/50 transition-colors cursor-pointer"
                   >
                     Tap to reveal Urdu translation
                   </button>
@@ -779,17 +845,17 @@ function SentencesPage() {
                 variant="outline"
                 size="lg"
                 onClick={prevCard}
-                disabled={currentIndex === 0}
+                disabled={safeIndex === 0}
                 className="h-12 text-sm font-medium gap-1"
               >
-                <ChevronUp className="w-4 h-4" /> Previous
+                <ChevronLeft className="w-4 h-4" /> Previous
               </Button>
 
               {/* Mark Mastered / Need Practice Toggle */}
               <Button
                 variant={isCurrentMastered ? "secondary" : "default"}
                 size="lg"
-                onClick={() => toggleMastery(currentSentence.id)}
+                onClick={() => currentSentence && toggleMastery(currentSentence.id)}
                 className={cn(
                   "h-12 text-sm font-medium gap-1.5 transition-colors",
                   isCurrentMastered
@@ -813,10 +879,10 @@ function SentencesPage() {
                 variant="outline"
                 size="lg"
                 onClick={nextCard}
-                disabled={currentIndex >= filtered.length - 1}
+                disabled={safeIndex >= filtered.length - 1}
                 className="h-12 text-sm font-medium gap-1"
               >
-                Next <ChevronDown className="w-4 h-4" />
+                Next <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -843,102 +909,151 @@ function SentencesPage() {
               <p className="font-medium">No matching sentences found</p>
             </Card>
           ) : (
-            <div className="space-y-2.5">
-              {filtered.map((s, idx) => {
-                const isMastered = !!masteredMap[s.id];
-                return (
-                  <Card
-                    key={s.id}
-                    className="p-4 shadow-card hover:shadow-elevated transition-shadow space-y-2 relative"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => navigate({ to: "/words/$id", params: { id: s.wordId } })}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                        >
-                          <span>{s.word}</span>
-                          <ArrowRight className="w-3.5 h-3.5 opacity-60" />
-                        </button>
-                        <span
-                          className={cn(
-                            "text-[10px] px-1.5 py-0.2 rounded border font-semibold",
-                            CATEGORY_CONFIG[s.category]?.colorBadge || "bg-muted text-muted-foreground"
-                          )}
-                        >
-                          {CATEGORY_CONFIG[s.category]?.shortLabel || "Category"}
-                        </span>
-                      </div>
+            (() => {
+              const listTotalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE));
+              const currentListPage = Math.min(listPage, listTotalPages);
+              const listFrom = (currentListPage - 1) * LIST_PAGE_SIZE;
+              const listItems = filtered.slice(listFrom, listFrom + LIST_PAGE_SIZE);
 
-                      <div className="flex items-center gap-1">
+              return (
+                <div className="space-y-3">
+                  <div className="space-y-2.5">
+                    {listItems.map((s) => {
+                      const isMastered = !!masteredMap[s.id];
+                      return (
+                        <Card
+                          key={s.id}
+                          className="p-4 shadow-card hover:shadow-elevated transition-shadow space-y-2 relative"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => navigate({ to: "/words/$id", params: { id: s.wordId } })}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                              >
+                                <span>{s.word}</span>
+                                <ArrowRight className="w-3.5 h-3.5 opacity-60" />
+                              </button>
+                              <span
+                                className={cn(
+                                  "text-[10px] px-1.5 py-0.2 rounded border font-semibold",
+                                  CATEGORY_CONFIG[s.category]?.colorBadge || "bg-muted text-muted-foreground"
+                                )}
+                              >
+                                {CATEGORY_CONFIG[s.category]?.shortLabel || "Category"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleMastery(s.id)}
+                                className={cn(
+                                  "h-7 px-2 text-xs",
+                                  isMastered ? "text-success font-semibold" : "text-muted-foreground",
+                                )}
+                              >
+                                {isMastered ? "✓ Mastered" : "Mark Mastered"}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="w-7 h-7 rounded-full"
+                                onClick={() => speak(s.en)}
+                              >
+                                <Volume2 className="w-4 h-4 text-muted-foreground" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <p className="text-base font-serif leading-relaxed text-foreground">
+                            "{clozeMode ? maskWord(s.en, s.word) : s.en}"
+                          </p>
+
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const res = await simplifyBatch({
+                                    data: {
+                                      sentences: [{ id: s.id, word: s.word, en: s.en }],
+                                    },
+                                  });
+                                  const newUr = res.translations?.[0]?.ur;
+                                  if (newUr) {
+                                    await updateWordSentenceUrdu(s.wordId, s.id, newUr);
+                                    qc.invalidateQueries({ queryKey: ["words-sentences"] });
+                                    qc.invalidateQueries({ queryKey: ["words"] });
+                                    toast.success("Updated to easy Urdu!");
+                                  }
+                                } catch (e) {
+                                  toast.error(e instanceof Error ? e.message : "Simplification failed");
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium shrink-0 cursor-pointer"
+                            >
+                              <Sparkles className="w-3 h-3" /> Easy Urdu
+                            </button>
+
+                            {s.ur && (
+                              <p
+                                className="font-urdu text-base sm:text-lg text-foreground/80 text-right leading-relaxed"
+                                dir="rtl"
+                              >
+                                {s.ur}
+                              </p>
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {/* List View Pagination Controls */}
+                  {listTotalPages > 1 && (
+                    <div className="flex items-center justify-between pt-2 border-t border-border/60 text-xs text-muted-foreground">
+                      <span>
+                        Showing {listFrom + 1}–{Math.min(listFrom + LIST_PAGE_SIZE, filtered.length)} of {filtered.length} sentences
+                      </span>
+                      <div className="flex items-center gap-1.5">
                         <Button
-                          type="button"
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          onClick={() => toggleMastery(s.id)}
-                          className={cn(
-                            "h-7 px-2 text-xs",
-                            isMastered ? "text-success font-semibold" : "text-muted-foreground",
-                          )}
+                          className="h-7 text-xs gap-1"
+                          disabled={currentListPage <= 1}
+                          onClick={() => {
+                            setListPage((p) => Math.max(1, p - 1));
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
                         >
-                          {isMastered ? "✓ Mastered" : "Mark Mastered"}
+                          <ChevronLeft className="w-3.5 h-3.5" /> Previous
                         </Button>
+                        <span className="font-medium">
+                          {currentListPage} / {listTotalPages}
+                        </span>
                         <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="w-7 h-7 rounded-full"
-                          onClick={() => speak(s.en)}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          disabled={currentListPage >= listTotalPages}
+                          onClick={() => {
+                            setListPage((p) => Math.min(listTotalPages, p + 1));
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
                         >
-                          <Volume2 className="w-4 h-4 text-muted-foreground" />
+                          Next <ChevronRight className="w-3.5 h-3.5" />
                         </Button>
                       </div>
                     </div>
-
-                    <p className="text-base font-serif leading-relaxed text-foreground">
-                      "{clozeMode ? maskWord(s.en, s.word) : s.en}"
-                    </p>
-
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/40">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            const res = await simplifyBatch({
-                              data: {
-                                sentences: [{ id: s.id, word: s.word, en: s.en }],
-                              },
-                            });
-                            const newUr = res.translations?.[0]?.ur;
-                            if (newUr) {
-                              await updateWordSentenceUrdu(s.wordId, s.id, newUr);
-                              qc.invalidateQueries({ queryKey: ["words-sentences"] });
-                              qc.invalidateQueries({ queryKey: ["words"] });
-                              toast.success("Updated to easy Urdu!");
-                            }
-                          } catch (e) {
-                            toast.error(e instanceof Error ? e.message : "Simplification failed");
-                          }
-                        }}
-                        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium shrink-0"
-                      >
-                        <Sparkles className="w-3 h-3" /> Easy Urdu
-                      </button>
-
-                      {s.ur && (
-                        <p
-                          className="font-urdu text-base sm:text-lg text-foreground/80 text-right leading-relaxed"
-                          dir="rtl"
-                        >
-                          {s.ur}
-                        </p>
-                      )}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                  )}
+                </div>
+              );
+            })()
           )}
         </div>
       )}

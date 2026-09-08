@@ -1,11 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { simplifySentencesBatch } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,14 +31,16 @@ import {
 import {
   ArrowLeft,
   Trash2,
-  ChevronUp,
-  ChevronDown,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
   Volume2,
   Loader2,
   Tag,
   BookMarked,
   Sparkles,
   Check,
+  Save,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -37,6 +50,8 @@ import { cn } from "@/lib/utils";
 import {
   FormalityRegister,
   REGISTER_CONFIG,
+  CATEGORY_CONFIG,
+  PermanentCategory,
   extractFormalitySpectrum,
   cleanUserNotes,
 } from "@/lib/formality";
@@ -45,8 +60,6 @@ import { FormalitySpectrum } from "@/components/FormalitySpectrum";
 export const Route = createFileRoute("/_app/words/$id")({
   component: WordDetailPage,
 });
-
-const SWIPE_THRESHOLD = 80;
 
 interface ExampleItem {
   en: string;
@@ -66,6 +79,11 @@ function WordDetailPage() {
       if (error) throw error;
       return data;
     },
+    initialData: () => {
+      const list = qc.getQueryData<any[]>(["words-all-raw"]);
+      return list?.find((item) => item.id === id);
+    },
+    staleTime: 5 * 60_000,
   });
 
   const { data: words } = useQuery({
@@ -78,60 +96,113 @@ function WordDetailPage() {
       if (error) throw error;
       return data;
     },
-    staleTime: 60_000,
+    initialData: () => {
+      const list = qc.getQueryData<any[]>(["words-all-raw"]);
+      return list?.map((x) => ({ id: x.id }));
+    },
+    staleTime: 5 * 60_000,
   });
 
   const idx = words?.findIndex((x) => x.id === id) ?? -1;
   const prevId = idx > 0 ? words![idx - 1].id : null;
   const nextId = idx >= 0 && words && idx < words.length - 1 ? words[idx + 1].id : null;
 
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [exiting, setExiting] = useState<null | "up" | "down">(null);
-  const startY = useRef(0);
-  const moved = useRef(false);
-
   const [deleting, setDeleting] = useState(false);
   const [simplifyingSentenceIdx, setSimplifyingSentenceIdx] = useState<number | null>(null);
 
-  const goTo = (targetId: string, dir: "up" | "down") => {
-    setExiting(dir);
-    const timer = window.setTimeout(() => {
-      setDragY(0);
-      setExiting(null);
-      navigate({ to: "/words/$id", params: { id: targetId } });
-    }, 200);
-    return () => clearTimeout(timer);
+  // Edit Modal State
+  const [editOpen, setEditOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editForm, setEditForm] = useState({
+    word: "",
+    part_of_speech: "",
+    category: "daily-life" as PermanentCategory,
+    one_word_en: "",
+    one_word_ur: "",
+    definition_en: "",
+    translation_ur: "",
+    synonym: "",
+    antonym: "",
+    formal: "",
+    neutral: "",
+    informal: "",
+    collocationsInput: "",
+    notes: "",
+  });
+
+  const openEditModal = () => {
+    if (!w) return;
+    const spectrum = extractFormalitySpectrum(w);
+    const collocations = Array.isArray(w.collocations) ? (w.collocations as string[]).join(", ") : "";
+    setEditForm({
+      word: w.word || "",
+      part_of_speech: w.part_of_speech || "",
+      category: spectrum.category || "daily-life",
+      one_word_en: w.one_word_en || "",
+      one_word_ur: w.one_word_ur || "",
+      definition_en: w.definition_en || "",
+      translation_ur: w.translation_ur || "",
+      synonym: w.synonym || "",
+      antonym: w.antonym || "",
+      formal: spectrum.formal || "",
+      neutral: spectrum.neutral || "",
+      informal: spectrum.informal || "",
+      collocationsInput: collocations,
+      notes: cleanUserNotes(w.notes),
+    });
+    setEditOpen(true);
   };
 
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (exiting) return;
-    startY.current = e.clientY;
-    moved.current = false;
-    setDragging(true);
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging || exiting) return;
-    const dy = e.clientY - startY.current;
-    if (Math.abs(dy) > 5) moved.current = true;
-    setDragY(dy);
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (!dragging || exiting) return;
-    setDragging(false);
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.word.trim()) {
+      toast.error("Word is required");
+      return;
+    }
+    setSavingEdit(true);
     try {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-    } catch {}
+      const parsedCollocations = editForm.collocationsInput
+        .split(/[,،\n]+/)
+        .map((c) => c.trim())
+        .filter(Boolean);
 
-    if (dragY < -SWIPE_THRESHOLD && nextId) {
-      goTo(nextId, "up");
-    } else if (dragY > SWIPE_THRESHOLD && prevId) {
-      goTo(prevId, "down");
-    } else {
-      setDragY(0);
+      const spectrumMeta = JSON.stringify({
+        category: editForm.category,
+        formal: editForm.formal.trim(),
+        neutral: editForm.neutral.trim(),
+        informal: editForm.informal.trim(),
+      });
+      const cleanNote = editForm.notes.trim();
+      const finalNotes = cleanNote ? `${spectrumMeta}\n${cleanNote}` : spectrumMeta;
+
+      const { error } = await supabase
+        .from("words")
+        .update({
+          word: editForm.word.trim(),
+          part_of_speech: editForm.part_of_speech.trim() || null,
+          one_word_en: editForm.one_word_en.trim() || null,
+          one_word_ur: editForm.one_word_ur.trim() || null,
+          definition_en: editForm.definition_en.trim() || null,
+          translation_ur: editForm.translation_ur.trim() || null,
+          synonym: editForm.synonym.trim() || null,
+          antonym: editForm.antonym.trim() || null,
+          collocations: parsedCollocations,
+          tags: [editForm.category],
+          notes: finalNotes,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      qc.invalidateQueries({ queryKey: ["word", id] });
+      qc.invalidateQueries({ queryKey: ["words"] });
+      qc.invalidateQueries({ queryKey: ["words-sentences"] });
+      toast.success("Word updated successfully");
+      setEditOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to update word");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -185,7 +256,22 @@ function WordDetailPage() {
     }
   };
 
-  if (isLoading) return <LoadingScreen />;
+  if (isLoading && !w) {
+    return (
+      <div className="space-y-4 max-w-xl mx-auto pb-6">
+        <header className="flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/words" })} className="h-8 px-2 text-xs">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Words
+          </Button>
+        </header>
+        <div className="p-6 rounded-2xl border border-border/70 bg-card/60 animate-pulse space-y-4">
+          <div className="h-8 bg-muted rounded w-36" />
+          <div className="h-5 bg-muted/60 rounded w-20" />
+          <div className="h-20 bg-muted/30 rounded-xl w-full" />
+        </div>
+      </div>
+    );
+  }
   if (!w) {
     return (
       <div className="space-y-4">
@@ -198,13 +284,6 @@ function WordDetailPage() {
       </div>
     );
   }
-
-  const translateY = exiting === "up" ? -300 : exiting === "down" ? 300 : dragY;
-  const rotate = dragY * 0.03;
-  const opacity = exiting ? 0 : 1 - Math.min(Math.abs(dragY) / 300, 0.4);
-
-  const showUpHint = dragY < -20 && nextId;
-  const showDownHint = dragY > 20 && prevId;
 
   const tags = Array.isArray(w.tags) ? (w.tags as string[]) : [];
   const collocations = Array.isArray(w.collocations) ? (w.collocations as string[]) : [];
@@ -219,76 +298,83 @@ function WordDetailPage() {
 
   return (
     <div className="space-y-3 max-w-xl mx-auto pb-6">
-      <header className="flex items-center justify-between">
+      <header className="flex items-center justify-between gap-2 flex-wrap">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => navigate({ to: "/words" })}
           className="h-8 px-2 text-xs"
         >
-          <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to words
+          <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Words
         </Button>
 
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2 text-xs"
-            >
-              <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete "{w.word}"?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently remove this word and its practice history.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={deleting}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        {/* Prev / Next navigation */}
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => prevId && navigate({ to: "/words/$id", params: { id: prevId } })}
+            disabled={!prevId}
+            className="h-8 px-2.5 text-xs"
+            title="Previous word"
+          >
+            <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Prev
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => nextId && navigate({ to: "/words/$id", params: { id: nextId } })}
+            disabled={!nextId}
+            className="h-8 px-2.5 text-xs"
+            title="Next word"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openEditModal}
+            className="h-8 px-2.5 text-xs font-medium"
+          >
+            <Pencil className="w-3.5 h-3.5 mr-1 text-primary" /> Edit
+          </Button>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2 text-xs"
               >
-                {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete "{w.word}"?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently remove this word and its practice history.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       </header>
 
-      <div className="relative touch-none select-none flex-1 flex">
-        <div
-          className={`pointer-events-none absolute inset-x-0 -top-2 flex justify-center transition-opacity z-10 ${showUpHint ? "opacity-100" : "opacity-0"}`}
-        >
-          <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-card">
-            <ChevronUp className="w-3.5 h-3.5" /> Next word
-          </div>
-        </div>
-        <div
-          className={`pointer-events-none absolute inset-x-0 -bottom-2 flex justify-center transition-opacity z-10 ${showDownHint ? "opacity-100" : "opacity-0"}`}
-        >
-          <div className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 shadow-card">
-            <ChevronDown className="w-3.5 h-3.5" /> Previous word
-          </div>
-        </div>
-
-        <div
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{
-            transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
-            opacity,
-            transition: dragging ? "none" : "transform 200ms ease, opacity 200ms ease",
-          }}
-          className="flex flex-col gap-4 flex-1 w-full"
-        >
-          <Card className="p-5 sm:p-7 rounded-2xl shadow-elevated border-border bg-card flex-1 flex flex-col space-y-5">
+      <Card className="p-5 sm:p-7 rounded-2xl shadow-elevated border-border bg-card flex flex-col space-y-5">
             <div className="flex items-start justify-between gap-4 pb-4 border-b border-border/70">
               <div className="space-y-1.5 flex-1">
                 <div className="flex items-center gap-2.5">
@@ -398,13 +484,27 @@ function WordDetailPage() {
                 </div>
               )}
 
-              {w.translation_ur && (
+              {(w.translation_ur || w.one_word_ur) ? (
                 <div className="p-4 rounded-xl bg-card border border-border space-y-1 text-right" dir="rtl">
                   <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground text-left" dir="ltr">
                     Urdu Meaning
                   </p>
                   <p className="font-urdu text-xl sm:text-2xl text-foreground/90 font-medium leading-relaxed pt-1">
-                    {w.translation_ur}
+                    {w.translation_ur || w.one_word_ur}
+                  </p>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-muted/20 border border-dashed border-border/80 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    No Urdu meaning added yet. Click{" "}
+                    <button
+                      type="button"
+                      onClick={openEditModal}
+                      className="font-semibold text-primary underline cursor-pointer"
+                    >
+                      Edit
+                    </button>{" "}
+                    to add one.
                   </p>
                 </div>
               )}
@@ -502,8 +602,267 @@ function WordDetailPage() {
               </div>
             )}
           </Card>
-        </div>
-      </div>
+
+      {/* Edit Word Dialog Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Word: {w.word}</DialogTitle>
+            <DialogDescription>
+              Update word details, meanings, category, and formality equivalents.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
+            {/* Word & Part of Speech */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-word" className="text-xs font-semibold">
+                  Word / Phrase <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-word"
+                  value={editForm.word}
+                  onChange={(e) => setEditForm((f) => ({ ...f, word: e.target.value }))}
+                  required
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-pos" className="text-xs font-semibold">
+                  Part of Speech
+                </Label>
+                <Input
+                  id="edit-pos"
+                  placeholder="noun, verb, adj…"
+                  value={editForm.part_of_speech}
+                  onChange={(e) => setEditForm((f) => ({ ...f, part_of_speech: e.target.value }))}
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Category Selector */}
+            <div>
+              <Label className="block text-xs font-semibold mb-1">Situation Category</Label>
+              <div role="radiogroup" aria-label="Situation Category" className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={editForm.category === "daily-life"}
+                  onClick={() => setEditForm((f) => ({ ...f, category: "daily-life" }))}
+                  className={cn(
+                    "py-2 px-2 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center cursor-pointer",
+                    editForm.category === "daily-life"
+                      ? "bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-200 border-purple-300 shadow-xs ring-1 ring-purple-400/20 font-semibold"
+                      : "bg-card text-muted-foreground border-border hover:border-purple-200 hover:text-foreground"
+                  )}
+                >
+                  <span>🏠 Daily Life</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={editForm.category === "workplace"}
+                  onClick={() => setEditForm((f) => ({ ...f, category: "workplace" }))}
+                  className={cn(
+                    "py-2 px-2 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center cursor-pointer",
+                    editForm.category === "workplace"
+                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200 border-emerald-300 shadow-xs ring-1 ring-emerald-400/20 font-semibold"
+                      : "bg-card text-muted-foreground border-border hover:border-emerald-200 hover:text-foreground"
+                  )}
+                >
+                  <span>💼 Workplace</span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={editForm.category === "news-reading"}
+                  onClick={() => setEditForm((f) => ({ ...f, category: "news-reading" }))}
+                  className={cn(
+                    "py-2 px-2 rounded-lg border text-xs font-medium transition-all text-center flex flex-col items-center cursor-pointer",
+                    editForm.category === "news-reading"
+                      ? "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200 border-sky-300 shadow-xs ring-1 ring-sky-400/20 font-semibold"
+                      : "bg-card text-muted-foreground border-border hover:border-sky-200 hover:text-foreground"
+                  )}
+                >
+                  <span>📰 News Reading</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Formality Spectrum Equivalents */}
+            <div className="p-3 rounded-xl bg-muted/20 border border-border/80 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                Formality Spectrum Equivalents
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <Label htmlFor="edit-informal" className="text-xs text-muted-foreground">
+                    🏠 Daily Life (Informal / Spoken)
+                  </Label>
+                  <Input
+                    id="edit-informal"
+                    placeholder="Informal conversational equivalent..."
+                    value={editForm.informal}
+                    onChange={(e) => setEditForm((f) => ({ ...f, informal: e.target.value }))}
+                    className="mt-1 h-8 text-base sm:text-xs bg-background"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-neutral" className="text-xs text-muted-foreground">
+                    💼 Workplace (Neutral / Professional)
+                  </Label>
+                  <Input
+                    id="edit-neutral"
+                    placeholder="Workplace professional equivalent..."
+                    value={editForm.neutral}
+                    onChange={(e) => setEditForm((f) => ({ ...f, neutral: e.target.value }))}
+                    className="mt-1 h-8 text-base sm:text-xs bg-background"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="edit-formal" className="text-xs text-muted-foreground">
+                    📰 News Reading (Formal / Academic)
+                  </Label>
+                  <Input
+                    id="edit-formal"
+                    placeholder="Formal / editorial equivalent..."
+                    value={editForm.formal}
+                    onChange={(e) => setEditForm((f) => ({ ...f, formal: e.target.value }))}
+                    className="mt-1 h-8 text-base sm:text-xs bg-background"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* English Definition & Urdu Meaning */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-def" className="text-xs font-semibold">
+                  English Definition
+                </Label>
+                <Textarea
+                  id="edit-def"
+                  rows={2}
+                  value={editForm.definition_en}
+                  onChange={(e) => setEditForm((f) => ({ ...f, definition_en: e.target.value }))}
+                  className="mt-1 text-xs resize-none"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-ur" className="text-xs font-semibold">
+                  Urdu Meaning
+                </Label>
+                <Textarea
+                  id="edit-ur"
+                  rows={2}
+                  value={editForm.translation_ur}
+                  onChange={(e) => setEditForm((f) => ({ ...f, translation_ur: e.target.value }))}
+                  className="mt-1 font-urdu text-sm resize-none"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+
+            {/* Quick 1-Word EN & UR */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-one-en" className="text-xs font-semibold">
+                  Quick 1-Word (EN)
+                </Label>
+                <Input
+                  id="edit-one-en"
+                  value={editForm.one_word_en}
+                  onChange={(e) => setEditForm((f) => ({ ...f, one_word_en: e.target.value }))}
+                  className="mt-1 h-9 text-xs"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-one-ur" className="text-xs font-semibold">
+                  Quick 1-Word (UR)
+                </Label>
+                <Input
+                  id="edit-one-ur"
+                  value={editForm.one_word_ur}
+                  onChange={(e) => setEditForm((f) => ({ ...f, one_word_ur: e.target.value }))}
+                  className="mt-1 h-9 font-urdu text-sm"
+                  dir="rtl"
+                />
+              </div>
+            </div>
+
+            {/* Synonym & Antonym */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="edit-syn" className="text-xs font-semibold">
+                  Synonym
+                </Label>
+                <Input
+                  id="edit-syn"
+                  value={editForm.synonym}
+                  onChange={(e) => setEditForm((f) => ({ ...f, synonym: e.target.value }))}
+                  className="mt-1 h-9 text-xs"
+                />
+              </div>
+              <div>
+                <Label htmlFor="edit-ant" className="text-xs font-semibold">
+                  Antonym
+                </Label>
+                <Input
+                  id="edit-ant"
+                  value={editForm.antonym}
+                  onChange={(e) => setEditForm((f) => ({ ...f, antonym: e.target.value }))}
+                  className="mt-1 h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Collocations */}
+            <div>
+              <Label htmlFor="edit-collocations" className="text-xs font-semibold">
+                Collocations (comma-separated)
+              </Label>
+              <Input
+                id="edit-collocations"
+                placeholder="deal with, take care of..."
+                value={editForm.collocationsInput}
+                onChange={(e) => setEditForm((f) => ({ ...f, collocationsInput: e.target.value }))}
+                className="mt-1 h-9 text-xs"
+              />
+            </div>
+
+            {/* Personal Notes */}
+            <div>
+              <Label htmlFor="edit-notes" className="text-xs font-semibold">
+                Personal Notes
+              </Label>
+              <Textarea
+                id="edit-notes"
+                rows={2}
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                className="mt-1 text-xs resize-none"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={savingEdit}>
+                {savingEdit ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Save className="w-4 h-4 mr-1" />}
+                {savingEdit ? "Saving…" : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

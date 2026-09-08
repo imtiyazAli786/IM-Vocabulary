@@ -173,6 +173,17 @@ function AddWordPage() {
       const { data: userRes } = await supabase.auth.getUser();
       if (!userRes.user) throw new Error("Not signed in");
 
+      // Check for duplicate word
+      const { data: existingWords } = await supabase
+        .from("words")
+        .select("id, word")
+        .ilike("word", form.word.trim())
+        .limit(1);
+
+      if (existingWords && existingWords.length > 0) {
+        toast.info(`Note: "${form.word.trim()}" already exists in your vocabulary.`);
+      }
+
       const parsedCollocations = form.collocationsInput
         .split(/[,،\n]+/)
         .map((c) => c.trim())
@@ -266,15 +277,17 @@ function AddWordPage() {
           {/* 2. Situation Category Selector */}
           <div>
             <Label className="block text-xs font-semibold mb-1.5">Situation Category *</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div role="radiogroup" aria-label="Situation Category" className="grid grid-cols-3 gap-2">
               <button
                 type="button"
+                role="radio"
+                aria-checked={form.category === "daily-life"}
                 onClick={() => setForm((f) => ({ ...f, category: "daily-life" }))}
                 className={cn(
-                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
+                  "py-2.5 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "daily-life"
-                    ? "bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-600/20"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                    ? "bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-200 border-purple-300 shadow-xs ring-1 ring-purple-400/20 font-semibold"
+                    : "bg-card text-muted-foreground border-border hover:border-purple-200 hover:text-foreground"
                 )}
               >
                 <span className="text-base">🏠</span>
@@ -284,12 +297,14 @@ function AddWordPage() {
 
               <button
                 type="button"
+                role="radio"
+                aria-checked={form.category === "workplace"}
                 onClick={() => setForm((f) => ({ ...f, category: "workplace" }))}
                 className={cn(
-                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
+                  "py-2.5 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "workplace"
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-sm ring-2 ring-emerald-600/20"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                    ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200 border-emerald-300 shadow-xs ring-1 ring-emerald-400/20 font-semibold"
+                    : "bg-card text-muted-foreground border-border hover:border-emerald-200 hover:text-foreground"
                 )}
               >
                 <span className="text-base">💼</span>
@@ -299,18 +314,68 @@ function AddWordPage() {
 
               <button
                 type="button"
+                role="radio"
+                aria-checked={form.category === "news-reading"}
                 onClick={() => setForm((f) => ({ ...f, category: "news-reading" }))}
                 className={cn(
-                  "py-2 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
+                  "py-2.5 px-2 rounded-xl border text-xs font-medium transition-all text-center flex flex-col items-center gap-0.5 cursor-pointer",
                   form.category === "news-reading"
-                    ? "bg-sky-600 text-white border-sky-600 shadow-sm ring-2 ring-sky-600/20"
-                    : "bg-card text-muted-foreground border-border hover:text-foreground"
+                    ? "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200 border-sky-300 shadow-xs ring-1 ring-sky-400/20 font-semibold"
+                    : "bg-card text-muted-foreground border-border hover:border-sky-200 hover:text-foreground"
                 )}
               >
                 <span className="text-base">📰</span>
                 <span className="font-semibold text-xs">News Reading</span>
                 <span className="text-[10px] opacity-80 hidden sm:inline">Articles & Essays</span>
               </button>
+            </div>
+          </div>
+
+          {/* Formality Spectrum Equivalents */}
+          <div className="p-3.5 rounded-xl bg-muted/20 border border-border/80 space-y-2.5">
+            <div>
+              <Label className="text-xs font-semibold">Formality Spectrum Equivalents</Label>
+              <p className="text-[11px] text-muted-foreground">
+                Equivalents across social registers (auto-filled by AI fill or editable manually)
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <Label htmlFor="bridge-informal" className="text-[11px] text-muted-foreground">
+                  🏠 Daily Life (Informal)
+                </Label>
+                <Input
+                  id="bridge-informal"
+                  placeholder="e.g. hang out, chill..."
+                  value={spectrumBridge.informal}
+                  onChange={(e) => setSpectrumBridge((s) => ({ ...s, informal: e.target.value }))}
+                  className="mt-1 h-9 text-base sm:text-xs bg-background"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bridge-neutral" className="text-[11px] text-muted-foreground">
+                  💼 Workplace (Neutral)
+                </Label>
+                <Input
+                  id="bridge-neutral"
+                  placeholder="e.g. collaborate, meet..."
+                  value={spectrumBridge.neutral}
+                  onChange={(e) => setSpectrumBridge((s) => ({ ...s, neutral: e.target.value }))}
+                  className="mt-1 h-9 text-base sm:text-xs bg-background"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bridge-formal" className="text-[11px] text-muted-foreground">
+                  📰 News Reading (Formal)
+                </Label>
+                <Input
+                  id="bridge-formal"
+                  placeholder="e.g. convene, deliberate..."
+                  value={spectrumBridge.formal}
+                  onChange={(e) => setSpectrumBridge((s) => ({ ...s, formal: e.target.value }))}
+                  className="mt-1 h-9 text-base sm:text-xs bg-background"
+                />
+              </div>
             </div>
           </div>
 
@@ -458,30 +523,32 @@ function AddWordPage() {
             {/* Single Compact Unified Card */}
             <div className="rounded-xl border border-border bg-card divide-y divide-border/60 shadow-sm overflow-hidden">
               {examples.map((ex, idx) => (
-                <div key={idx} className="p-3 space-y-1.5 hover:bg-muted/10 transition-colors">
-                  <div className="flex items-center gap-2">
-                    <Input
+                <div key={idx} className="p-3 space-y-2 hover:bg-muted/10 transition-colors">
+                  <div className="flex items-start gap-2">
+                    <Textarea
+                      rows={2}
                       placeholder="English example sentence..."
                       value={ex.en}
                       onChange={(e) => updateExample(idx, "en", e.target.value)}
-                      className="bg-background h-9 text-xs sm:text-sm flex-1"
+                      className="bg-background text-base sm:text-sm flex-1 resize-y min-h-[64px]"
                     />
                     {examples.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeExample(idx)}
-                        className="text-muted-foreground hover:text-destructive p-1.5 rounded-md hover:bg-destructive/10 transition-colors cursor-pointer shrink-0"
+                        className="text-muted-foreground hover:text-destructive p-1.5 rounded-md hover:bg-destructive/10 transition-colors cursor-pointer shrink-0 mt-1"
                         title="Remove sentence"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
-                  <Input
+                  <Textarea
+                    rows={2}
                     placeholder="آسان اور عام فہم اردو ترجمہ..."
                     value={ex.ur}
                     onChange={(e) => updateExample(idx, "ur", e.target.value)}
-                    className="bg-background h-9 font-urdu text-sm sm:text-base leading-normal"
+                    className="bg-background font-urdu text-sm sm:text-base leading-[1.8] resize-y min-h-[64px]"
                     dir="rtl"
                   />
                 </div>

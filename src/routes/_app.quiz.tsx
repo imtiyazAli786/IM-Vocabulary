@@ -107,7 +107,7 @@ function StatBlock({
 }) {
   return (
     <Card className="p-3 text-center shadow-card">
-      <Icon className={cn("w-4 h-4 mx-auto", accent ? "text-accent" : "text-primary")} />
+      <Icon className={cn("w-4 h-4 mx-auto", accent ? "text-highlight" : "text-primary")} />
       <p className="text-lg font-display font-semibold mt-1 tabular-nums">{value}</p>
       <p className="text-[10px] text-muted-foreground truncate">{label}</p>
     </Card>
@@ -136,7 +136,8 @@ function QuizPage() {
       if (error) throw error;
       return (data ?? []) as Word[];
     },
-    staleTime: 30_000,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
   });
 
   // Fetch dashboard statistics (due count, streak, progress)
@@ -166,16 +167,22 @@ function QuizPage() {
 
       return {
         streak: profileRes.data?.current_streak ?? 0,
+        longestStreak: profileRes.data?.longest_streak ?? 0,
+        lastStudyDate: profileRes.data?.last_study_date ?? null,
         dueCount: dueRes.count ?? 0,
         masteredCount: masteredRes.count ?? 0,
         totalCount: totalRes.count ?? 0,
         lastQuizPct: quizPct,
       };
     },
-    staleTime: 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
   });
+
+  interface Mistake {
+    question: Question;
+    userAnswer: string;
+  }
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [idx, setIdx] = useState(0);
@@ -187,6 +194,7 @@ function QuizPage() {
   const [mode, setMode] = useState<"mc" | "type">("mc");
   const [typedAnswer, setTypedAnswer] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [mistakes, setMistakes] = useState<Mistake[]>([]);
 
   useEffect(() => {
     if (words && questions.length === 0) setQuestions(buildQuiz(words));
@@ -198,7 +206,24 @@ function QuizPage() {
     }
   }, [idx, mode, picked]);
 
-  if (isWordsLoading || isDashLoading) return <LoadingScreen />;
+  if ((isWordsLoading && !words) || (isDashLoading && !dash)) {
+    return (
+      <div className="space-y-4 pb-8 max-w-xl mx-auto">
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-semibold">Quiz</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Preparing practice questions…</p>
+          </div>
+        </header>
+        <div className="grid grid-cols-4 gap-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="p-3 rounded-xl border border-border/70 bg-card/60 animate-pulse h-16" />
+          ))}
+        </div>
+        <div className="p-8 rounded-2xl border border-border/70 bg-card/60 animate-pulse h-64" />
+      </div>
+    );
+  }
 
   const pctMastered =
     dash && dash.totalCount > 0 ? Math.round((dash.masteredCount / dash.totalCount) * 100) : 0;
@@ -232,7 +257,11 @@ function QuizPage() {
   const choose = async (opt: string) => {
     if (picked) return;
     setPicked(opt);
-    if (opt === q.answer) setScore((s) => s + 1);
+    if (opt === q.answer) {
+      setScore((s) => s + 1);
+    } else {
+      setMistakes((prev) => [...prev, { question: q, userAnswer: opt }]);
+    }
     setTimeout(advance, 850);
   };
 
@@ -241,7 +270,11 @@ function QuizPage() {
     setSubmitted(true);
     const correct = fuzzyMatch(typedAnswer, q.answer);
     setPicked(correct ? "correct" : "wrong");
-    if (correct) setScore((s) => s + 1);
+    if (correct) {
+      setScore((s) => s + 1);
+    } else {
+      setMistakes((prev) => [...prev, { question: q, userAnswer: typedAnswer.trim() }]);
+    }
     setTimeout(advance, 1200);
   };
 
@@ -263,7 +296,7 @@ function QuizPage() {
         </div>
         <div className="flex items-center gap-2">
           {(dash?.streak ?? 0) > 0 && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/10 text-accent text-sm font-semibold">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-highlight/10 text-highlight text-sm font-semibold">
               <Flame className="w-4 h-4" />
               {dash?.streak}
             </div>
@@ -296,7 +329,7 @@ function QuizPage() {
             </Button>
           </Card>
         ) : done ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <Card className="p-8 text-center shadow-elevated bg-primary text-primary-foreground border-0 rounded-2xl">
               <Trophy className="w-12 h-12 mx-auto mb-2 opacity-90" />
               <p className="text-4xl font-display font-semibold">
@@ -310,6 +343,7 @@ function QuizPage() {
                     : "Keep practicing!"}
               </p>
             </Card>
+
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
@@ -321,6 +355,7 @@ function QuizPage() {
                   setDone(false);
                   setTypedAnswer("");
                   setSubmitted(false);
+                  setMistakes([]);
                 }}
               >
                 Play again
@@ -329,6 +364,63 @@ function QuizPage() {
                 Review Flashcards
               </Button>
             </div>
+
+            {/* Review Mistakes Section */}
+            {mistakes.length > 0 && (
+              <div className="space-y-2.5 pt-2">
+                <div className="flex items-center justify-between px-0.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <X className="w-3.5 h-3.5 text-destructive" /> Review Mistakes ({mistakes.length})
+                  </h3>
+                </div>
+
+                <div className="space-y-2">
+                  {mistakes.map((m, mIdx) => (
+                    <Card key={mIdx} className="p-3.5 shadow-card border-border space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-display font-bold text-base text-foreground">
+                          {m.question.word.word}
+                        </span>
+                        <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                          {m.question.type === "en-to-ur"
+                            ? "English → Urdu"
+                            : m.question.type === "ur-to-en"
+                            ? "Urdu → English"
+                            : "Fill-in-blank"}
+                        </span>
+                      </div>
+
+                      {m.question.type === "fill" && (
+                        <p className="text-xs italic text-muted-foreground">"{m.question.prompt}"</p>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-2 text-xs pt-1.5 border-t border-border/60">
+                        <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20 space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-destructive">Your Answer:</span>
+                          <p className="font-medium text-destructive break-words leading-relaxed">
+                            {m.userAnswer || "(skipped)"}
+                          </p>
+                        </div>
+                        <div className="p-2 rounded-lg bg-success/10 border border-success/20 space-y-0.5">
+                          <span className="text-[10px] uppercase font-bold text-success">Correct Answer:</span>
+                          <p
+                            className={cn(
+                              "font-medium text-success break-words",
+                              m.question.type === "en-to-ur"
+                                ? "font-urdu text-sm sm:text-base leading-[1.8]"
+                                : "leading-relaxed"
+                            )}
+                            dir={m.question.type === "en-to-ur" ? "rtl" : "ltr"}
+                          >
+                            {m.question.answer}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : q ? (
           <div className="space-y-3">
@@ -347,6 +439,7 @@ function QuizPage() {
                   setDone(false);
                   setTypedAnswer("");
                   setSubmitted(false);
+                  setMistakes([]);
                 }}
                 className={cn(
                   "flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg border transition-colors",

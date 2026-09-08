@@ -78,11 +78,8 @@ export function speak(text: string, lang = "en-US"): void {
         }
       };
 
-      // Slight timeout prevents cancel/speak race conditions in Chromium/WebKit
-      setTimeout(() => {
-        synth.speak(u);
-      }, 15);
-
+      // Call speak synchronously to preserve user activation gesture token on iOS Safari
+      synth.speak(u);
       return;
     } catch (e) {
       console.warn("SpeechSynthesis failed, trying audio fallback:", e);

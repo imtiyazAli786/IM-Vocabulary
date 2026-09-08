@@ -8,31 +8,23 @@ import { speak } from "@/lib/speech";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
-  RotateCw,
   Check,
   Sparkles,
-  ChevronUp,
-  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Volume2,
   BookOpen,
-  Layers,
-  Tag,
-  BookMarked,
-  ArrowRight,
+  Eye,
   RefreshCw,
-  Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
-  FormalityRegister,
   PermanentCategory,
   CATEGORY_CONFIG,
-  REGISTER_CONFIG,
   extractFormalitySpectrum,
 } from "@/lib/formality";
 import { FormalitySpectrum } from "@/components/FormalitySpectrum";
-import { UpgradeFormalityModal } from "@/components/UpgradeFormalityModal";
 
 export const Route = createFileRoute("/_app/review")({
   component: ReviewPage,
@@ -82,13 +74,8 @@ function ReviewPage() {
   const [idx, setIdx] = useState<number>(0);
   const [hasResumed, setHasResumed] = useState(false);
   const [sessionReviewed, setSessionReviewed] = useState(0);
+  const [isRevealed, setIsRevealed] = useState(false);
 
-  // Drag / swipe state
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const [exiting, setExiting] = useState<null | "up" | "down">(null);
-  const startY = useRef(0);
-  const moved = useRef(false);
   const committingRef = useRef(false);
   const userIdRef = useRef<string | null>(null);
 
@@ -115,8 +102,8 @@ function ReviewPage() {
       if (error) throw error;
       return data ?? [];
     },
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 5 * 60_000,
+    placeholderData: (prev) => prev,
   });
 
   // Calculate situation category counts
@@ -141,6 +128,7 @@ function ReviewPage() {
   const updateDeckType = (type: "due" | "all") => {
     setDeckType(type);
     setIdx(0);
+    setIsRevealed(false);
     try {
       localStorage.setItem(STORAGE_DECK_TYPE, type);
       localStorage.setItem(STORAGE_LAST_INDEX, "0");
@@ -150,6 +138,7 @@ function ReviewPage() {
   const updateSelectedCategory = (cat: "all" | PermanentCategory) => {
     setSelectedCategory(cat);
     setIdx(0);
+    setIsRevealed(false);
     try {
       localStorage.setItem(STORAGE_REGISTER, cat);
       localStorage.setItem(STORAGE_LAST_INDEX, "0");
@@ -182,6 +171,7 @@ function ReviewPage() {
       if (!words || words.length === 0) return;
       const clamped = Math.max(0, Math.min(words.length - 1, newIdx));
       setIdx(clamped);
+      setIsRevealed(false);
       try {
         localStorage.setItem(STORAGE_LAST_INDEX, String(clamped));
       } catch {}
@@ -250,41 +240,110 @@ function ReviewPage() {
     }
   };
 
-  const advanceWith = async (rating: Rating, dir: "up" | "down") => {
+  const advanceWith = async (rating: Rating) => {
     if (committingRef.current || !words) return;
     committingRef.current = true;
 
-    setExiting(dir);
     try {
       await commitRating(rating);
     } catch {}
 
-    window.setTimeout(() => {
-      setSessionReviewed((r) => r + 1);
-      setDragY(0);
-      setExiting(null);
+    setSessionReviewed((r) => r + 1);
+    setIsRevealed(false);
 
-      const next = idx + 1;
-      setIdx(next);
-      try {
-        localStorage.setItem(STORAGE_LAST_INDEX, String(next));
-      } catch {}
-      committingRef.current = false;
-    }, 220);
+    const next = idx + 1;
+    setIdx(next);
+    try {
+      localStorage.setItem(STORAGE_LAST_INDEX, String(next));
+    } catch {}
+    committingRef.current = false;
   };
 
-  // Keyboard navigation
+  // Touch Swipe Gesture handlers for mobile flashcards
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+
+    // Vertical swipe takes priority when deltaY is dominant (Instagram Reels / TikTok habit: Up for Next, Down for Previous)
+    if (Math.abs(deltaY) > 50 && Math.abs(deltaY) > Math.abs(deltaX) * 1.1) {
+      if (deltaY < 0) {
+        // Swiped Up (↑) -> Next Word
+        if (words && idx < words.length - 1) {
+          advanceWith("good");
+        }
+      } else {
+        // Swiped Down (↓) -> Previous Word
+        if (idx > 0) {
+          setCardIndex(idx - 1);
+        }
+      }
+    } else if (Math.abs(deltaX) > 50) {
+      // Horizontal swipe (Tinder style: Right for Good, Left for Again)
+      if (deltaX > 0) {
+        if (!isRevealed) {
+          setIsRevealed(true);
+        } else {
+          advanceWith("good");
+        }
+      } else {
+        if (!isRevealed) {
+          setIsRevealed(true);
+        } else {
+          advanceWith("again");
+        }
+      }
+    }
+
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // Keyboard navigation safely guarded
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          document.querySelector("[role='dialog']"))
+      ) {
+        return;
+      }
+
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
+        if (!isRevealed) {
+          setIsRevealed(true);
+        } else {
+          // Standard Anki convention: Spacebar on revealed card grades "Good"
+          advanceWith("good");
+        }
+      } else if (e.key.toLowerCase() === "r" || e.key.toLowerCase() === "p") {
+        e.preventDefault();
         if (current?.word) speak(current.word);
-      } else if (e.key === "ArrowUp" || e.key === "1") {
+      } else if (e.key === "1") {
         e.preventDefault();
-        advanceWith("good", "up");
-      } else if (e.key === "ArrowDown" || e.key === "2") {
+        if (isRevealed) advanceWith("again");
+      } else if (e.key === "2") {
         e.preventDefault();
-        advanceWith("again", "down");
+        if (isRevealed) advanceWith("hard");
+      } else if (e.key === "3") {
+        e.preventDefault();
+        if (isRevealed) advanceWith("good");
+      } else if (e.key === "4") {
+        e.preventDefault();
+        if (isRevealed) advanceWith("easy");
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         if (words && idx < words.length - 1) setCardIndex(idx + 1);
@@ -296,89 +355,88 @@ function ReviewPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [idx, words, current, setCardIndex]);
+  }, [idx, words, current, isRevealed, setCardIndex]);
 
-  // Touch pointer handlers for card swipe
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (exiting) return;
-    startY.current = e.clientY;
-    moved.current = false;
-    setDragging(true);
-    (e.target as Element).setPointerCapture?.(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    const dy = e.clientY - startY.current;
-    if (Math.abs(dy) > 5) moved.current = true;
-    setDragY(dy);
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (!dragging) return;
-    setDragging(false);
-    try {
-      (e.target as Element).releasePointerCapture?.(e.pointerId);
-    } catch {}
-
-    const dy = dragY;
-    if (!moved.current) {
-      setDragY(0);
-      return;
-    }
-
-    if (dy <= -SWIPE_THRESHOLD) {
-      advanceWith("good", "up"); // Swiped Up -> Good
-    } else if (dy >= SWIPE_THRESHOLD) {
-      advanceWith("again", "down"); // Swiped Down -> Again
-    } else {
-      setDragY(0);
-    }
-  };
-
-  if (isLoading) return <LoadingScreen />;
-
-  const totalCount = words?.length ?? 0;
-  const isFinished = !words || totalCount === 0 || idx >= totalCount;
-
-  // Deck completion view
-  if (isFinished) {
+  if (isLoading && (!rawWords || rawWords.length === 0)) {
     return (
-      <div className="space-y-4 max-w-xl mx-auto pb-6">
+      <div className="space-y-3 pb-6 max-w-xl mx-auto">
         <header className="flex items-center justify-between gap-2">
+          <h1 className="text-2xl font-display font-semibold">Review</h1>
+        </header>
+        <div className="w-full p-8 rounded-2xl border border-border/70 bg-card/60 animate-pulse space-y-4">
+          <div className="h-6 bg-muted rounded w-32 mx-auto" />
+          <div className="h-10 bg-muted/80 rounded w-48 mx-auto" />
+          <div className="h-4 bg-muted/50 rounded w-24 mx-auto" />
+          <div className="h-28 bg-muted/30 rounded-xl w-full mt-4" />
+        </div>
+      </div>
+    );
+  }
+
+  // 1. Empty State for Brand New Library (applies whether due or all was selected)
+  if (!rawWords || rawWords.length === 0) {
+    return (
+      <div className="space-y-4 max-w-xl mx-auto py-6">
+        <header className="flex items-center justify-between">
+          <h1 className="text-2xl font-display font-semibold">Review</h1>
+        </header>
+        <Card className="p-8 sm:p-10 text-center shadow-card rounded-2xl space-y-4 border-dashed">
+          <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto text-primary">
+            <BookOpen className="w-8 h-8" />
+          </div>
           <div>
-            <h1 className="text-2xl font-display font-semibold">Review</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {sessionReviewed > 0
-                ? `${sessionReviewed} cards reviewed in this session`
-                : "No cards pending in this deck"}
+            <h2 className="text-2xl font-display font-bold text-foreground">
+              Your library is empty
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1.5 max-w-sm mx-auto">
+              Add your first word or import a vocabulary list to start reviewing with spaced repetition.
             </p>
           </div>
+          <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
+            <Button onClick={() => navigate({ to: "/words/add" })} className="gap-1.5 font-medium">
+              <Sparkles className="w-4 h-4" /> Add your first word
+            </Button>
+            <Button variant="outline" onClick={() => navigate({ to: "/import" })}>
+              Import vocabulary
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-          <div className="flex items-center gap-1.5">
-            <UpgradeFormalityModal />
-            <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
-              <button
-                type="button"
-                onClick={() => updateDeckType("all")}
-                className={cn(
-                  "px-2.5 py-1 rounded-md font-medium transition-colors",
-                  deckType === "all" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-                )}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => updateDeckType("due")}
-                className={cn(
-                  "px-2.5 py-1 rounded-md font-medium transition-colors",
-                  deckType === "due" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground",
-                )}
-              >
-                Due
-              </button>
-            </div>
+  const totalCount = words?.length ?? 0;
+
+  // 2. Queue Completed State
+  if (totalCount === 0 || (words && idx >= totalCount)) {
+    return (
+      <div className="space-y-4 max-w-xl mx-auto py-6">
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-semibold">Review</h1>
+            <p className="text-xs text-muted-foreground">Session Complete</p>
+          </div>
+          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
+            <button
+              type="button"
+              onClick={() => updateDeckType("all")}
+              className={cn(
+                "px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer",
+                deckType === "all" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => updateDeckType("due")}
+              className={cn(
+                "px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer",
+                deckType === "due" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Due
+            </button>
           </div>
         </header>
 
@@ -387,11 +445,12 @@ function ReviewPage() {
           <button
             type="button"
             onClick={() => updateSelectedCategory("all")}
+            aria-pressed={selectedCategory === "all"}
             className={cn(
-              "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
               selectedCategory === "all"
-                ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                : "bg-card text-muted-foreground border-border hover:text-foreground"
+                ? "bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/20 font-semibold"
+                : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
             )}
           >
             All ({categoryCounts.all})
@@ -400,11 +459,12 @@ function ReviewPage() {
           <button
             type="button"
             onClick={() => updateSelectedCategory("daily-life")}
+            aria-pressed={selectedCategory === "daily-life"}
             className={cn(
-              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
               selectedCategory === "daily-life"
-                ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-                : "bg-card text-muted-foreground border-border hover:text-foreground"
+                ? CATEGORY_CONFIG["daily-life"].colorActivePill
+                : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
             )}
           >
             <span>🏠 Daily Life</span>
@@ -414,11 +474,12 @@ function ReviewPage() {
           <button
             type="button"
             onClick={() => updateSelectedCategory("workplace")}
+            aria-pressed={selectedCategory === "workplace"}
             className={cn(
-              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
               selectedCategory === "workplace"
-                ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-                : "bg-card text-muted-foreground border-border hover:text-foreground"
+                ? CATEGORY_CONFIG.workplace.colorActivePill
+                : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
             )}
           >
             <span>💼 Workplace</span>
@@ -428,11 +489,12 @@ function ReviewPage() {
           <button
             type="button"
             onClick={() => updateSelectedCategory("news-reading")}
+            aria-pressed={selectedCategory === "news-reading"}
             className={cn(
-              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+              "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
               selectedCategory === "news-reading"
-                ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-                : "bg-card text-muted-foreground border-border hover:text-foreground"
+                ? CATEGORY_CONFIG["news-reading"].colorActivePill
+                : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
             )}
           >
             <span>📰 News Reading</span>
@@ -446,7 +508,7 @@ function ReviewPage() {
           </div>
           <div>
             <h2 className="text-2xl font-display font-bold text-foreground">
-              {deckType === "due" ? "Due queue finished! 🎉" : "Deck completed! 🎉"}
+              {deckType === "due" ? "All caught up on due reviews! 🎉" : "Deck completed! 🎉"}
             </h2>
             <p className="text-sm text-muted-foreground mt-1.5">
               {sessionReviewed > 0
@@ -456,23 +518,25 @@ function ReviewPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={() => {
-                setCardIndex(0);
-                setSessionReviewed(0);
-              }}
-              className="gap-1.5 font-medium"
-            >
-              <RefreshCw className="w-4 h-4" /> Restart Deck (from #1)
-            </Button>
+            {totalCount > 0 && (
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => {
+                  setCardIndex(0);
+                  setSessionReviewed(0);
+                }}
+                className="gap-1.5 font-medium"
+              >
+                <RefreshCw className="w-4 h-4" /> Restart Deck (from #1)
+              </Button>
+            )}
             <Button
               size="lg"
               onClick={() => {
                 updateDeckType(deckType === "due" ? "all" : "due");
               }}
-              className="gap-1.5 font-medium"
+              className={cn("gap-1.5 font-medium", totalCount === 0 && "sm:col-span-2")}
             >
               {deckType === "due" ? "Practice All Words" : "Review Due Words"}
             </Button>
@@ -500,19 +564,13 @@ function ReviewPage() {
     );
   }
 
-  const translateY = exiting === "up" ? -800 : exiting === "down" ? 800 : dragY;
-  const rotate = (translateY / 30).toFixed(2);
-  const opacity = exiting ? 0 : Math.max(0.4, 1 - Math.abs(dragY) / 400);
+  if (!current) return null;
 
-  const showUpHint = dragY < -20;
-  const showDownHint = dragY > 20;
-
-  const currentCols = Array.isArray(current.collocations) ? current.collocations : [];
   const spectrum = extractFormalitySpectrum(current);
 
   return (
-    <div className="space-y-3 max-w-xl mx-auto pb-4 overflow-hidden">
-      {/* Top Header with Deck, Formality Upgrade, & Mode Switchers */}
+    <div className="space-y-3 max-w-xl mx-auto pb-4">
+      {/* Top Header with Deck & Mode Switchers */}
       <header className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-2xl font-display font-semibold">Review</h1>
@@ -522,33 +580,30 @@ function ReviewPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <UpgradeFormalityModal />
-          {/* Deck Mode Toggle (All vs Due) */}
-          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
-            <button
-              type="button"
-              onClick={() => updateDeckType("all")}
-              className={cn(
-                "px-2.5 py-1 rounded-md font-medium transition-colors",
-                deckType === "all" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
-              )}
-              title="Review all words continuously in sequence"
-            >
-              All
-            </button>
-            <button
-              type="button"
-              onClick={() => updateDeckType("due")}
-              className={cn(
-                "px-2.5 py-1 rounded-md font-medium transition-colors",
-                deckType === "due" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
-              )}
-              title="Review only words due by spaced repetition"
-            >
-              Due
-            </button>
-          </div>
+        {/* Deck Mode Toggle (All vs Due) */}
+        <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border text-xs">
+          <button
+            type="button"
+            onClick={() => updateDeckType("all")}
+            className={cn(
+              "px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer",
+              deckType === "all" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+            )}
+            title="Review all words continuously in sequence"
+          >
+            All
+          </button>
+          <button
+            type="button"
+            onClick={() => updateDeckType("due")}
+            className={cn(
+              "px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer",
+              deckType === "due" ? "bg-card text-foreground shadow-sm font-semibold" : "text-muted-foreground hover:text-foreground",
+            )}
+            title="Review only words due by spaced repetition"
+          >
+            Due
+          </button>
         </div>
       </header>
 
@@ -567,11 +622,12 @@ function ReviewPage() {
         <button
           type="button"
           onClick={() => updateSelectedCategory("all")}
+          aria-pressed={selectedCategory === "all"}
           className={cn(
-            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "all"
-              ? "bg-primary text-primary-foreground border-primary shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? "bg-primary text-primary-foreground border-primary shadow-xs ring-1 ring-primary/20 font-semibold"
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           All ({categoryCounts.all})
@@ -580,11 +636,12 @@ function ReviewPage() {
         <button
           type="button"
           onClick={() => updateSelectedCategory("daily-life")}
+          aria-pressed={selectedCategory === "daily-life"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "daily-life"
-              ? "bg-purple-600 text-white border-purple-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG["daily-life"].colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>🏠 Daily Life</span>
@@ -594,11 +651,12 @@ function ReviewPage() {
         <button
           type="button"
           onClick={() => updateSelectedCategory("workplace")}
+          aria-pressed={selectedCategory === "workplace"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "workplace"
-              ? "bg-emerald-600 text-white border-emerald-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG.workplace.colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>💼 Workplace</span>
@@ -608,11 +666,12 @@ function ReviewPage() {
         <button
           type="button"
           onClick={() => updateSelectedCategory("news-reading")}
+          aria-pressed={selectedCategory === "news-reading"}
           className={cn(
-            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border",
+            "inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-all shrink-0 border cursor-pointer",
             selectedCategory === "news-reading"
-              ? "bg-sky-600 text-white border-sky-600 shadow-sm"
-              : "bg-card text-muted-foreground border-border hover:text-foreground"
+              ? CATEGORY_CONFIG["news-reading"].colorActivePill
+              : "bg-card hover:bg-muted/60 text-muted-foreground border-border hover:text-foreground"
           )}
         >
           <span>📰 News Reading</span>
@@ -620,162 +679,191 @@ function ReviewPage() {
         </button>
       </div>
 
-      {/* Main Flashcard Container */}
-      <div
-        className="relative touch-none select-none"
-        style={{
-          height: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 18rem)",
-          minHeight: 340,
-          maxHeight: 520,
-        }}
+      {/* Main Flashcard Container with Natural Vertical Scrolling and Touch Swipe Support */}
+      <Card
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        className="w-full p-4 sm:p-5 shadow-elevated rounded-2xl border-border bg-card transition-all duration-200 select-none"
       >
-        {/* Swipe Hints */}
-        <div
-          className={`pointer-events-none absolute inset-x-0 -top-2 flex justify-center transition-opacity z-20 ${showUpHint ? "opacity-100" : "opacity-0"}`}
-        >
-          <div className="bg-success text-success-foreground px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-card">
-            <ChevronUp className="w-3.5 h-3.5" /> I know it (Good)
-          </div>
-        </div>
-        <div
-          className={`pointer-events-none absolute inset-x-0 -bottom-2 flex justify-center transition-opacity z-20 ${showDownHint ? "opacity-100" : "opacity-0"}`}
-        >
-          <div className="bg-destructive text-destructive-foreground px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1 shadow-card">
-            <ChevronDown className="w-3.5 h-3.5" /> Study again
-          </div>
-        </div>
-
-        {/* Card Body */}
-        <Card
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="h-full w-full p-3.5 sm:p-4.5 flex flex-col justify-start items-stretch text-center cursor-grab active:cursor-grabbing shadow-elevated select-none touch-none overflow-y-auto rounded-2xl border-border bg-card relative scrollbar-none"
-          style={{
-            transform: `translateY(${translateY}px) rotate(${rotate}deg)`,
-            opacity,
-            transition: dragging ? "none" : "transform 220ms ease, opacity 220ms ease",
-          }}
-        >
-          {/* DEFAULT CARD DETAILS: FULL USAGE SPECTRUM & MEANING */}
-          <div className="space-y-2.5 sm:space-y-3 w-full max-w-md mx-auto my-auto py-0.5">
-            {/* Category Badge Bar */}
-            <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-1.5">
+        <div className="space-y-3 w-full max-w-md mx-auto">
+          {/* Category & Register Bar */}
+          <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
+            <div className="flex items-center gap-1.5">
               <span
                 className={cn(
                   "text-[10px] uppercase tracking-wider font-bold px-2.5 py-0.5 rounded-full border",
                   CATEGORY_CONFIG[spectrum.category]?.colorBadge || "bg-primary/10 text-primary"
                 )}
               >
-                {CATEGORY_CONFIG[spectrum.category]?.label}
+                {CATEGORY_CONFIG[spectrum.category]?.shortLabel || "Category"}
               </span>
-
-              {current.one_word_en && (
-                <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {current.one_word_en}
+              {current.part_of_speech && (
+                <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                  {current.part_of_speech}
                 </span>
               )}
             </div>
 
-            {/* Hero Row: English Word + Audio on Left, Urdu 1-Word on Right */}
-            <div className="flex items-center justify-between gap-3 pt-1">
-              <div className="flex items-center gap-2">
-                <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight text-left">
-                  {current.word}
-                </p>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    speak(current.word);
-                  }}
-                  className="w-8 h-8 rounded-full bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-sm"
-                  title="Pronounce word"
-                >
-                  <Volume2 className="w-4 h-4" />
-                </button>
-              </div>
-
-              {current.one_word_ur && (
-                <p className="font-urdu text-2xl sm:text-3xl font-bold text-primary leading-none text-right shrink-0" dir="rtl">
-                  {current.one_word_ur}
-                </p>
-              )}
-            </div>
-
-            {/* Urdu Definition */}
-            {current.translation_ur && (
-              <p className="font-urdu text-base sm:text-lg text-foreground/90 font-medium leading-relaxed px-1 text-right pt-0.5" dir="rtl">
-                {current.translation_ur}
-              </p>
-            )}
-
-            {/* 3-Tier Usage Spectrum Bridge Component */}
-            <FormalitySpectrum data={spectrum} headword={current.word} />
-
-            {/* Sentence Audio & Phrasing */}
-            {primarySentence?.en && (
-              <div className="p-2 sm:p-2.5 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
-                    Example Dialogue
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="w-5 h-5 rounded-full"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      speak(primarySentence.en || "");
-                    }}
-                    title="Pronounce sentence"
-                  >
-                    <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
-                  </Button>
-                </div>
-                <p className="text-xs sm:text-sm italic font-serif text-foreground">"{primarySentence.en}"</p>
-                {primarySentence.ur && (
-                  <p className="font-urdu text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
-                    {primarySentence.ur}
-                  </p>
-                )}
-              </div>
+            {isRevealed && current.one_word_en && (
+              <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                {current.one_word_en}
+              </span>
             )}
           </div>
-        </Card>
-      </div>
 
-      {/* Bottom Controls / SRS Rating & Navigation Buttons */}
-      <div className="space-y-2 pt-1 pb-2">
-        {/* Direct 4 SRS Rating Buttons */}
-        <div className="grid grid-cols-4 gap-2">
-          <RateBtn
-            label="Again"
-            sub="< 10m"
-            color="bg-destructive text-destructive-foreground"
-            onClick={() => advanceWith("again", "down")}
-          />
-          <RateBtn
-            label="Hard"
-            sub="1d"
-            color="bg-warning text-warning-foreground"
-            onClick={() => advanceWith("hard", "down")}
-          />
-          <RateBtn
-            label="Good"
-            sub="3d+"
-            color="bg-primary text-primary-foreground"
-            onClick={() => advanceWith("good", "up")}
-          />
-          <RateBtn
-            label="Easy"
-            sub="long"
-            color="bg-success text-success-foreground"
-            onClick={() => advanceWith("easy", "up")}
-          />
+          {/* Prompt Row: English Headword + Pronunciation Audio */}
+          <div className="flex items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-2">
+              <p className="text-3xl sm:text-4xl font-display font-bold text-primary tracking-tight text-left">
+                {current.word}
+              </p>
+              <button
+                type="button"
+                onClick={() => speak(current.word)}
+                aria-label={`Pronounce ${current.word}`}
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-muted/60 hover:bg-primary/15 text-muted-foreground hover:text-primary flex items-center justify-center transition-all cursor-pointer shrink-0 active:scale-95 shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                title="Pronounce word"
+              >
+                <Volume2 className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Revealed: One-Word Urdu or Primary Translation */}
+            {isRevealed && (current.one_word_ur || current.translation_ur) && (
+              <p className="font-urdu text-2xl sm:text-3xl font-bold text-primary leading-[1.8] text-right shrink-0 py-0.5" dir="rtl">
+                {current.one_word_ur || current.translation_ur}
+              </p>
+            )}
+          </div>
+
+          {/* ACTIVE RECALL: UNREVEALED PROMPT VS REVEALED ANSWER */}
+          {!isRevealed ? (
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setIsRevealed(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setIsRevealed(true);
+                }
+              }}
+              aria-label="Reveal answer"
+              className="my-3 py-10 cursor-pointer flex flex-col items-center justify-center space-y-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center shadow-sm">
+                <Eye className="w-5 h-5" />
+              </div>
+              <div className="text-center px-4">
+                <p className="font-semibold text-sm sm:text-base text-foreground">
+                  Tap to Reveal Answer
+                </p>
+                <p className="text-sm sm:text-base text-muted-foreground mt-0.5 font-urdu leading-[1.8]" dir="rtl">
+                  معنی، ترجمہ اور استعمال دیکھیں
+                </p>
+              </div>
+              <span className="text-[11px] text-muted-foreground font-mono bg-card px-2.5 py-0.5 rounded border border-border/80">
+                Press Space ␣
+              </span>
+            </div>
+          ) : (
+            /* REVEALED CONTENT */
+            <div className="space-y-3 pt-1 animate-in fade-in-50 duration-200">
+              {/* Full Urdu Translation (if distinct from one_word_ur) */}
+              {current.translation_ur && current.one_word_ur && current.translation_ur !== current.one_word_ur && (
+                <div className="p-3 rounded-xl bg-card border border-border/70 text-right" dir="rtl">
+                  <p className="font-urdu text-base sm:text-lg text-foreground font-medium leading-relaxed">
+                    {current.translation_ur}
+                  </p>
+                </div>
+              )}
+
+              {/* Notice if no Urdu translation is stored yet */}
+              {!current.one_word_ur && !current.translation_ur && (
+                <div className="p-3 rounded-xl bg-muted/30 border border-dashed border-border/80 text-center">
+                  <p className="text-xs text-muted-foreground">
+                    No Urdu translation added yet for this word.
+                  </p>
+                </div>
+              )}
+
+              {/* 3-Tier Usage Spectrum Bridge */}
+              <FormalitySpectrum data={spectrum} headword={current.word} />
+
+              {/* Example Dialogue */}
+              {primarySentence?.en && (
+                <div className="p-2.5 sm:p-3 rounded-xl bg-muted/30 text-left border border-border/70 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-wider text-primary font-bold">
+                      Example Dialogue
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="w-5 h-5 rounded-full"
+                      onClick={() => speak(primarySentence.en || "")}
+                      aria-label="Pronounce example sentence"
+                      title="Pronounce sentence"
+                    >
+                      <Volume2 className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  </div>
+                  <p className="text-xs sm:text-sm italic font-serif text-foreground">
+                    "{primarySentence.en}"
+                  </p>
+                  {primarySentence.ur && (
+                    <p className="font-urdu text-sm text-muted-foreground text-right pt-0.5 leading-relaxed" dir="rtl">
+                      {primarySentence.ur}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
+      </Card>
+
+      {/* Bottom Controls / SRS Rating & Navigation */}
+      <div className="space-y-2 pt-1 pb-2">
+        {!isRevealed ? (
+          /* When unrevealed: Single clear action button */
+          <Button
+            size="lg"
+            onClick={() => setIsRevealed(true)}
+            className="w-full h-12 text-sm font-semibold gap-2 shadow-card cursor-pointer"
+          >
+            <Eye className="w-4 h-4" /> Show Answer (Space)
+          </Button>
+        ) : (
+          /* When revealed: 4 SRS Rating Buttons */
+          <div className="grid grid-cols-4 gap-2 animate-in fade-in-50 duration-200">
+            <RateBtn
+              label="Again"
+              sub="< 10m [1]"
+              color="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => advanceWith("again")}
+            />
+            <RateBtn
+              label="Hard"
+              sub="1d [2]"
+              color="bg-warning text-warning-foreground hover:bg-warning/90"
+              onClick={() => advanceWith("hard")}
+            />
+            <RateBtn
+              label="Good"
+              sub="3d+ [3]"
+              color="bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => advanceWith("good")}
+            />
+            <RateBtn
+              label="Easy"
+              sub="long [4]"
+              color="bg-success text-success-foreground hover:bg-success/90"
+              onClick={() => advanceWith("easy")}
+            />
+          </div>
+        )}
 
         {/* Previous & Next Navigation Row */}
         <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -786,11 +874,14 @@ function ReviewPage() {
             onClick={() => setCardIndex(idx - 1)}
             className="h-8 text-xs font-semibold shadow-sm cursor-pointer"
           >
-            ← Previous
+            <ChevronLeft className="w-3.5 h-3.5 mr-1" /> Previous
           </Button>
 
-          <span className="text-[11px] text-muted-foreground font-medium">
-            Swipe up (Good) · down (Again)
+          <span className="text-[11px] text-muted-foreground font-medium hidden sm:inline">
+            Keys: Space (Reveal) · 1-4 (Rate) · ← / →
+          </span>
+          <span className="text-[11px] text-muted-foreground font-medium sm:hidden">
+            Swipe: 👆 Next · 👇 Prev
           </span>
 
           <Button
@@ -800,7 +891,7 @@ function ReviewPage() {
             onClick={() => setCardIndex(idx + 1)}
             className="h-8 text-xs font-semibold shadow-sm cursor-pointer"
           >
-            Next →
+            Next <ChevronRight className="w-3.5 h-3.5 ml-1" />
           </Button>
         </div>
       </div>
@@ -821,8 +912,9 @@ function RateBtn({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`${color} rounded-xl py-2.5 px-1 font-medium text-xs sm:text-sm shadow-card active:scale-95 transition cursor-pointer`}
+      className={`${color} rounded-xl py-2 px-1 font-medium text-xs sm:text-sm shadow-card active:scale-95 transition cursor-pointer`}
     >
       <div>{label}</div>
       <div className="text-[10px] opacity-80 mt-0.5 font-mono">{sub}</div>
