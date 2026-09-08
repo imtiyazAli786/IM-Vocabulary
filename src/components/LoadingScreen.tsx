@@ -3,9 +3,9 @@ export function LoadingScreen() {
     <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-4">
       <div className="flex flex-col items-center gap-5">
         <img
-          src="/icon-512.png"
+          src="/favicon.svg"
           alt="Lafz"
-          className="w-16 h-16 rounded-2xl shadow-card"
+          className="w-16 h-16 rounded-2xl shadow-elevated"
         />
         <div className="flex flex-col items-center gap-3">
           <h1 className="text-2xl font-display font-semibold text-foreground">

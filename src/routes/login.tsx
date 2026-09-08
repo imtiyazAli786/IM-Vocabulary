@@ -86,9 +86,11 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center px-4 py-8 bg-background">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-primary-foreground mb-4 shadow-card">
-            <BookOpenCheck className="w-7 h-7" />
-          </div>
+          <img
+            src="/favicon.svg"
+            alt="Lafz"
+            className="w-16 h-16 mx-auto mb-4 rounded-2xl shadow-elevated"
+          />
           <h1 className="text-3xl font-display font-semibold">Lafz</h1>
           <p className="text-muted-foreground mt-1 text-sm">Remember every word, in English & Urdu.</p>
         </div>

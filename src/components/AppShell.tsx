@@ -14,10 +14,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
   return (
     <div className="min-h-[100dvh] bg-background">
+      <header
+        className="sticky top-0 z-30 border-b border-border/50 bg-background/85 backdrop-blur-md"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="mx-auto max-w-xl px-4 h-11 flex items-center justify-between">
+          <Link to="/review" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
+            <img
+              src="/favicon.svg"
+              alt="Lafz"
+              className="w-6 h-6 rounded-lg shadow-xs transition-transform group-hover:scale-105"
+            />
+            <span className="font-display font-semibold text-base text-foreground tracking-tight">
+              Lafz
+            </span>
+          </Link>
+        </div>
+      </header>
       <main
         className="mx-auto max-w-xl px-4 pt-3"
         style={{
-          paddingTop: "max(0.75rem, env(safe-area-inset-top))",
           paddingBottom: "calc(env(safe-area-inset-bottom) + 5.25rem)",
         }}
       >
