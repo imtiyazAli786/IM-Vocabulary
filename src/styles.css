@@ -4,11 +4,36 @@
 
 
 
+/* Microsoft Segoe UI official web font family */
+@font-face {
+  font-family: 'Segoe UI';
+  font-weight: 400;
+  src: local('Segoe UI'),
+       url('https://static2.sharepointonline.com/files/fabric/assets/fonts/segoeui-westeuropean/segoeui-regular.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  font-weight: 600;
+  src: local('Segoe UI Semibold'),
+       url('https://static2.sharepointonline.com/files/fabric/assets/fonts/segoeui-westeuropean/segoeui-semibold.woff2') format('woff2');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Segoe UI';
+  font-weight: 700;
+  src: local('Segoe UI Bold'),
+       url('https://static2.sharepointonline.com/files/fabric/assets/fonts/segoeui-westeuropean/segoeui-bold.woff2') format('woff2');
+  font-display: swap;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
-  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Aptos', 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Aptos Display', 'Aptos', 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', sans-serif;
   --font-urdu: 'Noto Nastaliq Urdu', serif;
 
   --radius-sm: calc(var(--radius) - 4px);
