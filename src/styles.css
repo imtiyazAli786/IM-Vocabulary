@@ -7,7 +7,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   --font-display: 'Fraunces', Georgia, serif;
   --font-urdu: 'Noto Nastaliq Urdu', serif;
 
