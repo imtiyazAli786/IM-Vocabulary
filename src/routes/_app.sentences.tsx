@@ -473,7 +473,7 @@ function SentencesPage() {
   const isCurrentMastered = currentSentence ? !!masteredMap[currentSentence.id] : false;
 
   return (
-    <div className="space-y-3 pb-4 max-w-xl mx-auto">
+    <div className={cn("space-y-2.5 pb-1 max-w-xl mx-auto", viewMode === "cards" && "flex-1 flex flex-col justify-between")}>
       {/* Top Header & Mastery Summary */}
       <header className="flex items-center justify-between gap-2">
         <div>
@@ -723,20 +723,20 @@ function SentencesPage() {
           </Card>
         ) : (
           <div
-            className="space-y-3 select-none touch-pan-y"
+            className="flex-1 flex flex-col justify-between gap-2.5 select-none touch-pan-y"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
           >
             {/* Card Index & Progress Pill */}
-            <div className="flex items-center justify-between px-1">
+            <div className="flex items-center justify-between px-1 shrink-0">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Card {safeIndex + 1} of {filtered.length}
               </span>
-              <span className="text-xs text-muted-foreground">Swipe or use buttons</span>
+              <span className="text-xs text-muted-foreground">👆 Up: Next · 👇 Down: Prev</span>
             </div>
 
-            {/* Main Interactive Swipe Card */}
-            <Card className="p-6 sm:p-8 shadow-elevated border-border bg-card rounded-2xl min-h-[340px] flex flex-col justify-between relative transition-all">
+            {/* Main Interactive Swipe Card - positioned in thumb zone */}
+            <Card className="p-5 sm:p-7 shadow-elevated border-border bg-card rounded-2xl flex-1 flex flex-col justify-between relative transition-all min-h-[380px] sm:min-h-[420px]">
               {/* Card Header: Headword, Type, Category Badge, TTS */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
@@ -839,7 +839,7 @@ function SentencesPage() {
             </Card>
 
             {/* Bottom Card Actions & Navigation Controls */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-3 gap-2 pt-1 shrink-0">
               {/* Previous Button */}
               <Button
                 variant="outline"

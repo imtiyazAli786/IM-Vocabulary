@@ -569,7 +569,7 @@ function ReviewPage() {
   const spectrum = extractFormalitySpectrum(current);
 
   return (
-    <div className="space-y-3 max-w-xl mx-auto pb-4">
+    <div className="space-y-2.5 max-w-xl mx-auto pb-1 flex-1 flex flex-col justify-between">
       {/* Top Header with Deck & Mode Switchers */}
       <header className="flex items-center justify-between gap-2">
         <div>
@@ -679,13 +679,16 @@ function ReviewPage() {
         </button>
       </div>
 
-      {/* Main Flashcard Container with Natural Vertical Scrolling and Touch Swipe Support */}
-      <Card
+      {/* Main Flashcard Container & Thumb-Accessible Controls */}
+      <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        className="w-full p-4 sm:p-5 shadow-elevated rounded-2xl border-border bg-card transition-all duration-200 select-none"
+        className="flex-1 flex flex-col justify-between gap-2.5 select-none touch-pan-y"
       >
-        <div className="space-y-3 w-full max-w-md mx-auto">
+        <Card
+          className="w-full p-4 sm:p-5 shadow-elevated rounded-2xl border-border bg-card transition-all duration-200 flex-1 flex flex-col justify-between min-h-[380px] sm:min-h-[420px]"
+        >
+          <div className="space-y-3 w-full max-w-md mx-auto flex-1 flex flex-col justify-between">
           {/* Category & Register Bar */}
           <div className="flex items-center justify-between gap-2 border-b border-border/50 pb-2">
             <div className="flex items-center gap-1.5">
@@ -896,6 +899,7 @@ function ReviewPage() {
         </div>
       </div>
     </div>
+  </div>
   );
 }
 

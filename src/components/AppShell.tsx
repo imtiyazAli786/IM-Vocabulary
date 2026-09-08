@@ -13,9 +13,9 @@ const nav = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const loc = useLocation();
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="min-h-[100dvh] bg-background flex flex-col">
       <header
-        className="sticky top-0 z-30 border-b border-border/50 bg-background/85 backdrop-blur-md"
+        className="sticky top-0 z-30 border-b border-border/50 bg-background/85 backdrop-blur-md shrink-0"
         style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="mx-auto max-w-xl px-4 h-11 flex items-center justify-between">
@@ -32,9 +32,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main
-        className="mx-auto max-w-xl px-4 pt-3"
+        className="mx-auto w-full max-w-xl px-4 pt-2.5 flex-1 flex flex-col"
         style={{
-          paddingBottom: "calc(env(safe-area-inset-bottom) + 5.25rem)",
+          paddingBottom: "calc(env(safe-area-inset-bottom) + 4.5rem)",
         }}
       >
         {children}
