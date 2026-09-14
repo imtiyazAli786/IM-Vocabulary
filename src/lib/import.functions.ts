@@ -8,48 +8,65 @@ const Input = z.object({
   text: z.string().min(1).max(50000),
 });
 
-const SYSTEM = `You are an expert bilingual English-Urdu vocabulary extraction assistant for learners.
-Your highest priority is to extract vocabulary entries and ensure ALL Urdu translations and sentence examples are in VERY SIMPLE, NATURAL, EVERYDAY CONVERSATIONAL URDU (انتہائی آسان اور عام فہم اردو).
+const SYSTEM = `You are an expert bilingual English-Urdu vocabulary extraction and language learning assistant.
+Your highest priority is to extract vocabulary entries and ALWAYS generate simple, natural, everyday conversational Urdu (انتہائی آسان اور عام فہم اردو) for EVERY extracted word.
 
-CRITICAL URDU & CONVERSATIONAL RULES:
-1. DAILY LIFE & SPOKEN FOCUS: Extract or generate practical, spoken, everyday conversational example sentences (like dialogues in reality shows, news discussions, and interpersonal daily chats).
-2. STRICTLY AVOID difficult, heavy, archaic, literary, or Persian/Arabic-heavy words (e.g. do not use "استفسار", "معاونت", "مسرت", "تحیر", "مستعد", "استقامت", "ادراک").
-3. Use common everyday words (e.g. "پوچھنا", "مدد", "خوشی", "حیرانی", "تیار", "مضبوط رہنا", "سمجھنا").
-4. Make all sentence translations natural and flowing in spoken Urdu, not rigid literal word-for-word.
+MANDATORY RULES:
+1. ALWAYS GENERATE URDU: Even if the input document contains ONLY English words or partial notes without any Urdu, you MUST generate and provide complete Urdu translations, 1-word Urdu equivalents, and conversational example sentences for EVERY single entry. NEVER leave Urdu fields blank.
+2. SIMPLE CONVERSATIONAL URDU (عام فہم اردو):
+   - Use simple words that everyday people, beginners, and children understand immediately.
+   - ❌ STRICTLY AVOID difficult, heavy, archaic, or literary words (e.g. do NOT use "استفسار", "معاونت", "مسرت", "تحیر", "مستعد", "استقامت", "ادراک", "اجتناب", "تخفیف").
+   - ✅ USE everyday spoken words (e.g. "پوچھنا", "مدد", "خوشی", "حیرانی", "تیار", "مضبوط رہنا", "سمجھنا", "رکنا", "کم کرنا", "شامل کرنا", "نیا کام").
+3. CONCISE 1-WORD URDU (one_word_ur):
+   - 1 to 2 words in Urdu script (e.g. "باسی", "مضبوط", "کم کرنا", "شامل کرنا", "نئی ذمہ داری").
+4. URDU TRANSLATION (translation_ur):
+   - Clear, everyday Urdu meaning in 1 short sentence (max 15 words).
+5. PRACTICAL EXAMPLES:
+   - example_en: Practical spoken/workplace conversation sentence with the word in quotes.
+   - example_ur: Translated into VERY SIMPLE, natural spoken Urdu (max 14 words).
+6. 3-TIER SITUATION SPECTRUM:
+   - register / category: "daily-life" (Home/Friends/Casual) | "workplace" (Office/Professional) | "news-reading" (Newspapers/Formal)
+   - formal_equivalent: single newspaper/formal word
+   - neutral_equivalent: single standard workplace word
+   - spoken_equivalent: conversational / phrasal verb equivalent
 
-Given raw text from a user's vocabulary document, extract every vocabulary word/entry and return ONLY a JSON object in the exact format {"entries": [...]}. Each entry object must have these keys (use empty string if missing):
-- word: the English word
-- register: "formal" (Newspapers/Articles) | "neutral" (Everyday Life) | "informal" (Reality Shows / Slang / Phrasal Verbs)
-- formal_equivalent: single formal/newspaper word
-- neutral_equivalent: single standard everyday word
-- spoken_equivalent: conversational / reality-show / phrasal verb equivalent
-- part_of_speech: noun, verb, adjective, etc.
-- one_word_en: a SINGLE common English word with the same meaning (one word only)
-- one_word_ur: a SINGLE VERY SIMPLE, everyday Urdu word (one word in Urdu script).
-- synonym: ONE common English synonym (single word)
-- antonym: ONE common English antonym (single word)
-- definition_en: a simple, clear definition in plain English.
-- translation_ur: a SIMPLE, clear, everyday Urdu meaning in ONE short sentence (max 15 words).
-- example_en: a practical spoken/conversational example sentence. Wrap the headword in quotes.
-- example_ur: the example translated into VERY SIMPLE, natural spoken Urdu (max 14 words).
-- notes: any extra context or formality metadata
-
-Return ONLY valid JSON matching {"entries": [...]}. Infer missing fields when possible.`;
+Given raw text from a vocabulary document, extract all vocabulary words and return ONLY a JSON object in this exact format:
+{"entries": [
+  {
+    "word": "English word",
+    "part_of_speech": "noun | verb | adj | phrase...",
+    "category": "daily-life | workplace | news-reading",
+    "register": "daily-life | workplace | news-reading",
+    "formal_equivalent": "...",
+    "neutral_equivalent": "...",
+    "spoken_equivalent": "...",
+    "one_word_en": "concise English meaning",
+    "one_word_ur": "concise Urdu meaning in Urdu script",
+    "synonym": "single English synonym",
+    "antonym": "single English antonym",
+    "definition_en": "clear plain English definition",
+    "translation_ur": "simple conversational Urdu sentence",
+    "example_en": "practical English example sentence",
+    "example_ur": "natural simple Urdu translation of example",
+    "notes": "extra context or collocations"
+  }
+]}
+`;
 
 export const parseVocabularyDocument = createServerFn({ method: "POST" })
   .validator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url } = getAiConfig();
-    const fallbackModels = [
-      "gemini-2.5-flash-lite",
-      "gemini-3.6-flash",
-      "gemini-flash-latest",
-      "gemini-2.5-flash",
-    ];
+    const { apiKey, url, model: defaultModel } = getAiConfig();
+    const isGeminiDirect = url.includes("generativelanguage.googleapis.com");
 
+    const fallbackModels = isGeminiDirect
+      ? [defaultModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+      : [defaultModel, "google/gemini-2.5-flash", "google/gemini-2.0-flash", "google/gemini-1.5-flash"];
+
+    const uniqueModels = Array.from(new Set(fallbackModels.filter(Boolean)));
     let lastError: Error | null = null;
 
-    for (const model of fallbackModels) {
+    for (const model of uniqueModels) {
       try {
         const res = await fetch(url, {
           method: "POST",
@@ -61,7 +78,7 @@ export const parseVocabularyDocument = createServerFn({ method: "POST" })
             model,
             messages: [
               { role: "system", content: SYSTEM },
-              { role: "user", content: `Extract vocabulary from this document text:\n\n${data.text.slice(0, 12000)}` },
+              { role: "user", content: `Extract vocabulary from this document text and provide full Urdu translations for every word:\n\n${data.text.slice(0, 35000)}` },
             ],
             response_format: { type: "json_object" },
           }),
@@ -71,7 +88,7 @@ export const parseVocabularyDocument = createServerFn({ method: "POST" })
           const errText = await res.text();
           console.warn(`Model ${model} failed (${res.status}): ${errText.slice(0, 200)}`);
           lastError = new Error(`AI model ${model} error: ${res.status}`);
-          continue; // Try next model
+          continue;
         }
 
         const j = await res.json();

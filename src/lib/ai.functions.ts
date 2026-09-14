@@ -120,6 +120,84 @@ export const enrichWord = createServerFn({ method: "POST" })
     }
   });
 
+const UrduOnlyInput = z.object({
+  word: z.string().min(1).max(120),
+  definition_en: z.string().optional(),
+  examples_en: z.array(z.string()).optional(),
+});
+
+const URDU_ONLY_SYSTEM = `You are an expert English-to-Urdu bilingual language teacher.
+Your highest priority is to provide VERY SIMPLE, NATURAL, EVERYDAY CONVERSATIONAL URDU (انتہائی آسان اور عام فہم اردو).
+
+RULES:
+1. CONCISE 1-WORD URDU (one_word_ur):
+   - 1 to 2 words in Urdu script only (e.g. "باسی", "مضبوط", "کم کرنا", "شامل کرنا", "نئی ذمہ داری").
+   - AVOID archaic/literary terms.
+2. URDU TRANSLATION (translation_ur):
+   - Short, crystal clear Urdu meaning in 1 conversational sentence (max 15 words).
+3. EXAMPLE TRANSLATIONS:
+   - For any provided English example sentences, translate them into natural, simple spoken Urdu.
+   - If no examples provided, provide 1 practical conversational example with simple Urdu translation.
+
+Return ONLY compact JSON:
+{
+  "one_word_ur": "concise urdu word(s)",
+  "translation_ur": "simple urdu sentence",
+  "examples": [
+    {"en": "...", "ur": "simple spoken urdu translation"}
+  ]
+}
+`;
+
+export const regenerateUrduOnly = createServerFn({ method: "POST" })
+  .validator((d: unknown) => UrduOnlyInput.parse(d))
+  .handler(async ({ data }) => {
+    const { apiKey, url, model } = getAiConfig();
+
+    let userPrompt = `Word: "${data.word}"`;
+    if (data.definition_en) {
+      userPrompt += `\nEnglish Meaning: "${data.definition_en}"`;
+    }
+    if (data.examples_en && data.examples_en.length > 0) {
+      userPrompt += `\nExample Sentences to translate:\n${data.examples_en.map((ex, i) => `${i + 1}. ${ex}`).join("\n")}`;
+    }
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: URDU_ONLY_SYSTEM },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.3,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.error(`AI regenerateUrduOnly error ${res.status}: ${err.slice(0, 300)}`);
+      throw new Error("Failed to generate Urdu translation. Please try again.");
+    }
+
+    const j = await res.json();
+    const content = j.choices?.[0]?.message?.content ?? "{}";
+    try {
+      return JSON.parse(content) as {
+        one_word_ur?: string;
+        translation_ur?: string;
+        examples?: Array<{ en: string; ur: string }>;
+      };
+    } catch {
+      return {};
+    }
+  });
+
 const FormalityBatchInput = z.object({
   words: z.array(
     z.object({

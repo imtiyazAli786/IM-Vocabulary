@@ -4,11 +4,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { parseVocabularyDocument, getLocalCSVEntries } from "@/lib/import.functions";
+import { enrichWord } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Upload, FileText, Check, Loader2, Save, X, Database } from "lucide-react";
+import { ArrowLeft, Upload, FileText, Check, Loader2, Save, X, Database, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import mammoth from "mammoth";
 import { TYPE_COLORS, formatType } from "@/lib/constants";
@@ -48,6 +49,7 @@ function ImportPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const parseDoc = useServerFn(parseVocabularyDocument);
   const loadLocalCSV = useServerFn(getLocalCSVEntries);
+  const enrich = useServerFn(enrichWord);
 
   const [step, setStep] = useState<"upload" | "parsing" | "review" | "saving">("upload");
   const [entries, setEntries] = useState<ParsedEntry[]>([]);
@@ -55,6 +57,8 @@ function ImportPage() {
   const [savedCount, setSavedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [reviewLimit, setReviewLimit] = useState(100);
+  const [enrichingUrdu, setEnrichingUrdu] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -173,7 +177,93 @@ function ImportPage() {
     setEntries((prev) => prev.map((e) => ({ ...e, selected: checked })));
   };
 
-  const selectedCount = entries.filter((e) => e.selected).length;
+  const missingUrduCount = entries.filter((e) => !e.one_word_ur && !e.translation_ur).length;
+
+  const handleEnrichSingleEntry = async (index: number) => {
+    const target = entries[index];
+    if (!target || !target.word) return;
+    try {
+      toast.info(`Generating Urdu for "${target.word}"…`);
+      const r = await enrich({ data: { word: target.word.trim() } });
+      setEntries((prev) => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          one_word_ur: r.one_word_ur || next[index].one_word_ur,
+          translation_ur: r.translation_ur || next[index].translation_ur,
+          one_word_en: r.one_word_en || next[index].one_word_en,
+          definition_en: r.definition_en || next[index].definition_en,
+          example_en: r.example_en || next[index].example_en,
+          example_ur: r.example_ur || next[index].example_ur,
+          category: r.category || next[index].category,
+          formal_equivalent: r.formal || r.formal_equivalent || next[index].formal_equivalent,
+          neutral_equivalent: r.neutral || r.neutral_equivalent || next[index].neutral_equivalent,
+          spoken_equivalent: r.informal || r.spoken_equivalent || next[index].spoken_equivalent,
+          synonym: r.synonym || next[index].synonym,
+          antonym: r.antonym || next[index].antonym,
+        };
+        return next;
+      });
+      toast.success(`Generated Urdu for "${target.word}"`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to generate Urdu");
+    }
+  };
+
+  const handleEnrichMissingUrdu = async () => {
+    const missingIndices = entries
+      .map((e, idx) => (!e.one_word_ur && !e.translation_ur ? idx : -1))
+      .filter((idx) => idx !== -1);
+
+    if (missingIndices.length === 0) {
+      toast.success("All entries already have Urdu translations!");
+      return;
+    }
+
+    setEnrichingUrdu(true);
+    setEnrichProgress({ done: 0, total: missingIndices.length });
+
+    let completed = 0;
+    try {
+      for (const idx of missingIndices) {
+        const entry = entries[idx];
+        if (!entry || !entry.word) continue;
+        try {
+          const r = await enrich({ data: { word: entry.word.trim() } });
+          setEntries((prev) => {
+            const next = [...prev];
+            if (next[idx]) {
+              next[idx] = {
+                ...next[idx],
+                one_word_ur: r.one_word_ur || next[idx].one_word_ur,
+                translation_ur: r.translation_ur || next[idx].translation_ur,
+                one_word_en: r.one_word_en || next[idx].one_word_en,
+                definition_en: r.definition_en || next[idx].definition_en,
+                example_en: r.example_en || next[idx].example_en,
+                example_ur: r.example_ur || next[idx].example_ur,
+                category: r.category || next[idx].category,
+                formal_equivalent: r.formal || r.formal_equivalent || next[idx].formal_equivalent,
+                neutral_equivalent: r.neutral || r.neutral_equivalent || next[idx].neutral_equivalent,
+                spoken_equivalent: r.informal || r.spoken_equivalent || next[idx].spoken_equivalent,
+                synonym: r.synonym || next[idx].synonym,
+                antonym: r.antonym || next[idx].antonym,
+              };
+            }
+            return next;
+          });
+        } catch (err) {
+          console.warn(`Failed to enrich word "${entry.word}":`, err);
+        }
+        completed++;
+        setEnrichProgress({ done: completed, total: missingIndices.length });
+      }
+      toast.success(`Completed Urdu generation for ${completed} entries!`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Urdu auto-fill failed");
+    } finally {
+      setEnrichingUrdu(false);
+    }
+  };
 
   const handleSave = async () => {
     const toSave = entries.filter((e) => e.selected && e.word.trim());
@@ -389,12 +479,33 @@ function ImportPage() {
 
       {step === "review" && (
         <>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-sm text-muted-foreground">
               <FileText className="w-3.5 h-3.5 inline mr-1" />
               {fileName} — {entries.length} found ({selectedCount} selected)
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {missingUrduCount > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEnrichMissingUrdu}
+                  disabled={enrichingUrdu}
+                  className="h-8 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                >
+                  {enrichingUrdu ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      Filling ({enrichProgress.done}/{enrichProgress.total})…
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5 mr-1" />
+                      Auto-Fill Missing Urdu ({missingUrduCount})
+                    </>
+                  )}
+                </Button>
+              )}
               <Label className="text-xs flex items-center gap-1.5 cursor-pointer">
                 <Checkbox
                   checked={entries.length > 0 && entries.every((e) => e.selected)}
@@ -406,89 +517,114 @@ function ImportPage() {
           </div>
 
           <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {entries.slice(0, reviewLimit).map((entry, i) => (
-              <Card
-                key={i}
-                className={`p-4 shadow-card transition-opacity ${entry.selected ? "" : "opacity-50"}`}
-              >
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    checked={entry.selected}
-                    onCheckedChange={() => toggleSelect(i)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-display font-semibold text-lg">{entry.word}</h3>
-                      {entry.type && (
-                        <span
-                          className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium ${TYPE_COLORS[entry.type] || "bg-muted text-muted-foreground"}`}
-                        >
-                          {formatType(entry.type)}
-                        </span>
+            {entries.slice(0, reviewLimit).map((entry, i) => {
+              const hasUrdu = !!(entry.one_word_ur || entry.translation_ur);
+
+              return (
+                <Card
+                  key={i}
+                  className={`p-4 shadow-card transition-opacity ${entry.selected ? "" : "opacity-50"}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={entry.selected}
+                      onCheckedChange={() => toggleSelect(i)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-display font-semibold text-lg">{entry.word}</h3>
+                          {entry.type && (
+                            <span
+                              className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-medium ${TYPE_COLORS[entry.type] || "bg-muted text-muted-foreground"}`}
+                            >
+                              {formatType(entry.type)}
+                            </span>
+                          )}
+                          {entry.part_of_speech && (
+                            <span className="text-[10px] uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
+                              {entry.part_of_speech}
+                            </span>
+                          )}
+                          {!hasUrdu && (
+                            <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                              Needs Urdu
+                            </span>
+                          )}
+                        </div>
+
+                        {!hasUrdu && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleEnrichSingleEntry(i)}
+                            className="h-7 px-2 text-xs text-primary hover:bg-primary/10"
+                            title="Generate Urdu with AI"
+                          >
+                            <Sparkles className="w-3 h-3 mr-1" /> Generate Urdu
+                          </Button>
+                        )}
+                      </div>
+
+                      {(entry.one_word_en || entry.one_word_ur || entry.synonym || entry.antonym) && (
+                        <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px]">
+                          {entry.one_word_en && (
+                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                              = {entry.one_word_en}
+                            </span>
+                          )}
+                          {entry.one_word_ur && (
+                            <span
+                              className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-urdu text-sm"
+                              dir="rtl"
+                            >
+                              = {entry.one_word_ur}
+                            </span>
+                          )}
+                          {entry.synonym && (
+                            <span className="px-1.5 py-0.5 rounded bg-success/10 text-success">
+                              syn: {entry.synonym}
+                            </span>
+                          )}
+                          {entry.antonym && (
+                            <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
+                              ant: {entry.antonym}
+                            </span>
+                          )}
+                        </div>
                       )}
-                      {entry.part_of_speech && (
-                        <span className="text-[10px] uppercase tracking-wider bg-muted px-1.5 py-0.5 rounded text-muted-foreground">
-                          {entry.part_of_speech}
-                        </span>
+                      {entry.translation_ur && (
+                        <p className="font-urdu text-xl mt-1 text-foreground" dir="rtl">
+                          {entry.translation_ur}
+                        </p>
+                      )}
+                      {entry.definition_en && (
+                        <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+                          {entry.definition_en}
+                        </p>
+                      )}
+                      {(entry.example_en || entry.example_ur) && (
+                        <div className="mt-2 pl-3 border-l-2 border-accent/40 space-y-1">
+                          {entry.example_en && (
+                            <p className="text-sm italic text-foreground">"{entry.example_en}"</p>
+                          )}
+                          {entry.example_ur && (
+                            <p className="font-urdu text-base" dir="rtl">
+                              {entry.example_ur}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {entry.notes && (
+                        <p className="text-xs text-muted-foreground mt-2">{entry.notes}</p>
                       )}
                     </div>
-                    {(entry.one_word_en || entry.one_word_ur || entry.synonym || entry.antonym) && (
-                      <div className="flex flex-wrap gap-1.5 mt-1.5 text-[11px]">
-                        {entry.one_word_en && (
-                          <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                            = {entry.one_word_en}
-                          </span>
-                        )}
-                        {entry.one_word_ur && (
-                          <span
-                            className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-urdu text-sm"
-                            dir="rtl"
-                          >
-                            = {entry.one_word_ur}
-                          </span>
-                        )}
-                        {entry.synonym && (
-                          <span className="px-1.5 py-0.5 rounded bg-success/10 text-success">
-                            syn: {entry.synonym}
-                          </span>
-                        )}
-                        {entry.antonym && (
-                          <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive">
-                            ant: {entry.antonym}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {entry.translation_ur && (
-                      <p className="font-urdu text-xl mt-1 text-foreground" dir="rtl">
-                        {entry.translation_ur}
-                      </p>
-                    )}
-                    {entry.definition_en && (
-                      <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                        {entry.definition_en}
-                      </p>
-                    )}
-                    {(entry.example_en || entry.example_ur) && (
-                      <div className="mt-2 pl-3 border-l-2 border-accent/40 space-y-1">
-                        {entry.example_en && (
-                          <p className="text-sm italic text-foreground">"{entry.example_en}"</p>
-                        )}
-                        {entry.example_ur && (
-                          <p className="font-urdu text-base" dir="rtl">
-                            {entry.example_ur}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    {entry.notes && (
-                      <p className="text-xs text-muted-foreground mt-2">{entry.notes}</p>
-                    )}
                   </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
 
             {entries.length > reviewLimit && (
               <div className="text-center py-4 bg-muted/20 rounded-lg border border-dashed">

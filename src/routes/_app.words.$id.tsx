@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { simplifySentencesBatch } from "@/lib/ai.functions";
+import { simplifySentencesBatch, enrichWord, regenerateUrduOnly } from "@/lib/ai.functions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -41,6 +41,8 @@ import {
   Sparkles,
   Check,
   Save,
+  Wand2,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { LoadingScreen } from "@/components/LoadingScreen";
@@ -109,6 +111,155 @@ function WordDetailPage() {
 
   const [deleting, setDeleting] = useState(false);
   const [simplifyingSentenceIdx, setSimplifyingSentenceIdx] = useState<number | null>(null);
+
+  const enrich = useServerFn(enrichWord);
+  const regenUrdu = useServerFn(regenerateUrduOnly);
+
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [regenerating, setRegenerating] = useState<"full" | "urdu" | null>(null);
+  const [autoFillingEdit, setAutoFillingEdit] = useState(false);
+
+  const handleFullRegenerate = async () => {
+    if (!w) return;
+    setRegenerating("full");
+    try {
+      toast.info(`Regenerating full details for "${w.word}" with AI…`);
+      const r = await enrich({ data: { word: w.word } });
+
+      const parsedCollocations = r.collocations || (Array.isArray(w.collocations) ? w.collocations : []);
+      const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
+
+      const spectrumMeta = JSON.stringify({
+        category: detectedCat,
+        formal: r.formal || r.formal_equivalent || "",
+        neutral: r.neutral || r.neutral_equivalent || "",
+        informal: r.informal || r.spoken_equivalent || "",
+      });
+      const cleanNote = cleanUserNotes(w.notes);
+      const finalNotes = cleanNote ? `${spectrumMeta}\n${cleanNote}` : spectrumMeta;
+
+      const updatedExamples = r.examples && r.examples.length > 0
+        ? r.examples
+        : (r.example_en || r.example_ur)
+        ? [{ en: r.example_en || "", ur: r.example_ur || "" }]
+        : (Array.isArray(w.examples) ? w.examples : []);
+
+      const { error } = await supabase
+        .from("words")
+        .update({
+          part_of_speech: r.part_of_speech || w.part_of_speech,
+          one_word_en: r.one_word_en || w.one_word_en,
+          one_word_ur: r.one_word_ur || w.one_word_ur,
+          definition_en: r.definition_en || w.definition_en,
+          translation_ur: r.translation_ur || w.translation_ur,
+          synonym: r.synonym || w.synonym,
+          antonym: r.antonym || w.antonym,
+          example_en: r.example_en || w.example_en,
+          example_ur: r.example_ur || w.example_ur,
+          examples: updatedExamples,
+          collocations: parsedCollocations,
+          tags: [detectedCat],
+          notes: finalNotes,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await qc.invalidateQueries({ queryKey: ["word", id] });
+      await qc.invalidateQueries({ queryKey: ["words"] });
+      await qc.invalidateQueries({ queryKey: ["words-all-raw"] });
+      await qc.invalidateQueries({ queryKey: ["words-sentences"] });
+      toast.success(`Successfully regenerated "${w.word}"!`);
+      setRegenOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to regenerate word");
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
+  const handleUrduOnlyRegenerate = async () => {
+    if (!w) return;
+    setRegenerating("urdu");
+    try {
+      toast.info(`Generating simple Urdu translations for "${w.word}"…`);
+      const existingSentenceTexts = (Array.isArray(w.examples) && w.examples.length > 0
+        ? (w.examples as ExampleItem[]).map((s) => s.en).filter(Boolean)
+        : w.example_en ? [w.example_en] : []
+      );
+
+      const r = await regenUrdu({
+        data: {
+          word: w.word,
+          definition_en: w.definition_en || undefined,
+          examples_en: existingSentenceTexts.length > 0 ? existingSentenceTexts : undefined,
+        },
+      });
+
+      let updatedExamples = Array.isArray(w.examples) ? [...w.examples] : [];
+      if (r.examples && r.examples.length > 0) {
+        updatedExamples = r.examples;
+      }
+
+      const { error } = await supabase
+        .from("words")
+        .update({
+          one_word_ur: r.one_word_ur || w.one_word_ur,
+          translation_ur: r.translation_ur || w.translation_ur,
+          example_ur: updatedExamples[0]?.ur || w.example_ur,
+          examples: updatedExamples,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await qc.invalidateQueries({ queryKey: ["word", id] });
+      await qc.invalidateQueries({ queryKey: ["words"] });
+      await qc.invalidateQueries({ queryKey: ["words-all-raw"] });
+      await qc.invalidateQueries({ queryKey: ["words-sentences"] });
+      toast.success(`Updated Urdu for "${w.word}"!`);
+      setRegenOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to generate Urdu");
+    } finally {
+      setRegenerating(null);
+    }
+  };
+
+  const handleAutoFillEdit = async () => {
+    if (!editForm.word.trim()) {
+      toast.error("Enter a word first");
+      return;
+    }
+    setAutoFillingEdit(true);
+    try {
+      toast.info(`Fetching AI data for "${editForm.word}"…`);
+      const r = await enrich({ data: { word: editForm.word.trim() } });
+      const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
+      const generatedCollocations = r.collocations && r.collocations.length > 0 ? r.collocations.join(", ") : editForm.collocationsInput;
+
+      setEditForm((f) => ({
+        ...f,
+        part_of_speech: r.part_of_speech || f.part_of_speech,
+        category: (detectedCat as PermanentCategory) || f.category,
+        informal: r.informal || r.spoken_equivalent || f.informal,
+        neutral: r.neutral || r.neutral_equivalent || f.neutral,
+        formal: r.formal || r.formal_equivalent || f.formal,
+        definition_en: r.definition_en || f.definition_en,
+        translation_ur: r.translation_ur || f.translation_ur,
+        one_word_en: r.one_word_en || f.one_word_en,
+        one_word_ur: r.one_word_ur || f.one_word_ur,
+        synonym: r.synonym || f.synonym,
+        antonym: r.antonym || f.antonym,
+        collocationsInput: generatedCollocations,
+      }));
+      toast.success("Form populated with AI data! Review and click Save.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "AI Auto-Fill failed");
+    } finally {
+      setAutoFillingEdit(false);
+    }
+  };
 
   // Edit Modal State
   const [editOpen, setEditOpen] = useState(false);
@@ -332,7 +483,17 @@ function WordDetailPage() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRegenOpen(true)}
+            className="h-8 px-2.5 text-xs font-medium border-primary/40 text-primary hover:bg-primary/10"
+            title="Regenerate with AI"
+          >
+            <Sparkles className="w-3.5 h-3.5 mr-1" /> AI Regenerate
+          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -421,16 +582,55 @@ function WordDetailPage() {
                 </div>
               </div>
 
-              <div className="text-right shrink-0">
+              <div className="text-right shrink-0 flex flex-col items-end gap-1">
                 {w.one_word_ur ? (
-                  <p className="font-urdu text-xl sm:text-2xl font-semibold text-primary leading-normal" dir="rtl">
-                    {w.one_word_ur}
-                  </p>
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <p className="font-urdu text-xl sm:text-2xl font-semibold text-primary leading-normal" dir="rtl">
+                      {w.one_word_ur}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleUrduOnlyRegenerate}
+                      disabled={!!regenerating}
+                      className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-primary/10 cursor-pointer"
+                      title="Regenerate Urdu meaning with AI"
+                      aria-label="Regenerate Urdu meaning with AI"
+                    >
+                      <RefreshCw className={cn("w-3.5 h-3.5", regenerating === "urdu" && "animate-spin text-primary")} />
+                    </button>
+                  </div>
                 ) : w.translation_ur ? (
-                  <p className="font-urdu text-lg sm:text-xl font-medium text-primary leading-normal" dir="rtl">
-                    {w.translation_ur}
-                  </p>
-                ) : null}
+                  <div className="flex items-center gap-1.5 justify-end">
+                    <p className="font-urdu text-lg sm:text-xl font-medium text-primary leading-normal" dir="rtl">
+                      {w.translation_ur}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleUrduOnlyRegenerate}
+                      disabled={!!regenerating}
+                      className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-full hover:bg-primary/10 cursor-pointer"
+                      title="Regenerate Urdu meaning with AI"
+                      aria-label="Regenerate Urdu meaning with AI"
+                    >
+                      <RefreshCw className={cn("w-3.5 h-3.5", regenerating === "urdu" && "animate-spin text-primary")} />
+                    </button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleUrduOnlyRegenerate}
+                    disabled={!!regenerating}
+                    className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/10"
+                  >
+                    {regenerating === "urdu" ? (
+                      <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3 h-3 mr-1" />
+                    )}
+                    Generate Urdu
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -606,11 +806,28 @@ function WordDetailPage() {
       {/* Edit Word Dialog Modal */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Word: {w.word}</DialogTitle>
-            <DialogDescription>
-              Update word details, meanings, category, and formality equivalents.
-            </DialogDescription>
+          <DialogHeader className="flex flex-row items-start justify-between gap-2 pr-6">
+            <div>
+              <DialogTitle>Edit Word: {w.word}</DialogTitle>
+              <DialogDescription>
+                Update word details, meanings, category, and formality equivalents.
+              </DialogDescription>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAutoFillEdit}
+              disabled={autoFillingEdit}
+              className="h-8 text-xs border-primary/40 text-primary hover:bg-primary/10 shrink-0"
+            >
+              {autoFillingEdit ? (
+                <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+              ) : (
+                <Wand2 className="w-3.5 h-3.5 mr-1" />
+              )}
+              Auto-Fill with AI
+            </Button>
           </DialogHeader>
 
           <form onSubmit={handleSaveEdit} className="space-y-4 pt-2">
@@ -861,6 +1078,64 @@ function WordDetailPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Regenerate Options Modal */}
+      <Dialog open={regenOpen} onOpenChange={setRegenOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" /> Regenerate "{w.word}" with AI
+            </DialogTitle>
+            <DialogDescription>
+              Choose how you want AI to enhance or translate this word.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-3">
+            <Card
+              className="p-4 hover:border-primary/50 cursor-pointer transition-colors shadow-xs group"
+              onClick={() => !regenerating && handleFullRegenerate()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-sm text-foreground">Full AI Re-Enrichment</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Regenerates definition, 1-word Urdu, Urdu translation, situation category, formality spectrum, collocations, and easy Urdu example sentences.
+                  </p>
+                </div>
+                {regenerating === "full" && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+              </div>
+            </Card>
+
+            <Card
+              className="p-4 hover:border-primary/50 cursor-pointer transition-colors shadow-xs group"
+              onClick={() => !regenerating && handleUrduOnlyRegenerate()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                  <RefreshCw className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-sm text-foreground">Regenerate Urdu Only</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    Refreshes 1-word Urdu, Urdu definition, and sentence translations in very simple conversational Urdu. Preserves your custom English definitions and personal notes.
+                  </p>
+                </div>
+                {regenerating === "urdu" && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
+              </div>
+            </Card>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setRegenOpen(false)} disabled={!!regenerating}>
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

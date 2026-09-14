@@ -1,8 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState, useEffect, useMemo } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { enrichWord } from "@/lib/ai.functions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,7 +17,9 @@ import {
   ChevronRight,
   Volume2,
   X,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { TYPE_COLORS, formatType } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { speak } from "@/lib/speech";
@@ -23,6 +27,7 @@ import {
   FormalityRegister,
   REGISTER_CONFIG,
   extractFormalitySpectrum,
+  cleanUserNotes,
 } from "@/lib/formality";
 
 const searchSchema = z.object({
@@ -145,6 +150,63 @@ function WordsPage() {
         register: next,
       },
     });
+  };
+
+  const qc = useQueryClient();
+  const enrich = useServerFn(enrichWord);
+  const [quickGeneratingId, setQuickGeneratingId] = useState<string | null>(null);
+
+  const handleQuickGenerateUrdu = async (e: React.MouseEvent, wordItem: any) => {
+    e.stopPropagation();
+    if (quickGeneratingId) return;
+    setQuickGeneratingId(wordItem.id);
+    try {
+      toast.info(`Generating Urdu for "${wordItem.word}"…`);
+      const r = await enrich({ data: { word: wordItem.word.trim() } });
+      const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
+
+      const spectrumMeta = JSON.stringify({
+        category: detectedCat,
+        formal: r.formal || r.formal_equivalent || "",
+        neutral: r.neutral || r.neutral_equivalent || "",
+        informal: r.informal || r.spoken_equivalent || "",
+      });
+      const cleanNote = cleanUserNotes(wordItem.notes);
+      const finalNotes = cleanNote ? `${spectrumMeta}\n${cleanNote}` : spectrumMeta;
+
+      const updatedExamples = r.examples && r.examples.length > 0
+        ? r.examples
+        : (r.example_en || r.example_ur)
+        ? [{ en: r.example_en || "", ur: r.example_ur || "" }]
+        : (Array.isArray(wordItem.examples) ? wordItem.examples : []);
+
+      const { error } = await supabase
+        .from("words")
+        .update({
+          one_word_ur: r.one_word_ur || wordItem.one_word_ur,
+          translation_ur: r.translation_ur || wordItem.translation_ur,
+          one_word_en: r.one_word_en || wordItem.one_word_en,
+          definition_en: r.definition_en || wordItem.definition_en,
+          part_of_speech: r.part_of_speech || wordItem.part_of_speech,
+          example_en: r.example_en || wordItem.example_en,
+          example_ur: r.example_ur || wordItem.example_ur,
+          examples: updatedExamples,
+          tags: [detectedCat],
+          notes: finalNotes,
+        })
+        .eq("id", wordItem.id);
+
+      if (error) throw error;
+
+      await qc.invalidateQueries({ queryKey: ["words-all-raw"] });
+      await qc.invalidateQueries({ queryKey: ["words"] });
+      await qc.invalidateQueries({ queryKey: ["word", wordItem.id] });
+      toast.success(`Generated Urdu for "${wordItem.word}"!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to generate Urdu");
+    } finally {
+      setQuickGeneratingId(null);
+    }
   };
 
   const clearFilters = () => {
@@ -448,9 +510,22 @@ function WordsPage() {
                           {w.translation_ur}
                         </p>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground/40 font-medium group-hover:text-primary transition-colors">
-                          Add Urdu →
-                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={quickGeneratingId === w.id}
+                          onClick={(e) => handleQuickGenerateUrdu(e, w)}
+                          className="h-7 px-2 text-xs border-primary/40 text-primary hover:bg-primary/10 cursor-pointer"
+                          title="Generate Urdu with AI"
+                        >
+                          {quickGeneratingId === w.id ? (
+                            <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-3 h-3 mr-1" />
+                          )}
+                          + Add Urdu
+                        </Button>
                       )}
                     </div>
                   </div>
