@@ -167,6 +167,10 @@ function WordsPage() {
     try {
       toast.info(`Generating Urdu for "${wordItem.word}"…`);
       const r = await enrich({ data: { word: wordItem.word.trim() } });
+      if (!r || (!r.one_word_ur && !r.translation_ur)) {
+        throw new Error("AI could not generate an Urdu translation for this word. Please try again.");
+      }
+
       const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
 
       const spectrumMeta = JSON.stringify({
@@ -184,23 +188,33 @@ function WordsPage() {
         ? [{ en: r.example_en || "", ur: r.example_ur || "" }]
         : (Array.isArray(wordItem.examples) ? wordItem.examples : []);
 
+      const updatePayload = {
+        one_word_ur: r.one_word_ur || wordItem.one_word_ur,
+        translation_ur: r.translation_ur || wordItem.translation_ur,
+        one_word_en: r.one_word_en || wordItem.one_word_en,
+        definition_en: r.definition_en || wordItem.definition_en,
+        part_of_speech: r.part_of_speech || wordItem.part_of_speech,
+        example_en: r.example_en || wordItem.example_en,
+        example_ur: r.example_ur || wordItem.example_ur,
+        examples: updatedExamples,
+        tags: [detectedCat],
+        notes: finalNotes,
+      };
+
       const { error } = await supabase
         .from("words")
-        .update({
-          one_word_ur: r.one_word_ur || wordItem.one_word_ur,
-          translation_ur: r.translation_ur || wordItem.translation_ur,
-          one_word_en: r.one_word_en || wordItem.one_word_en,
-          definition_en: r.definition_en || wordItem.definition_en,
-          part_of_speech: r.part_of_speech || wordItem.part_of_speech,
-          example_en: r.example_en || wordItem.example_en,
-          example_ur: r.example_ur || wordItem.example_ur,
-          examples: updatedExamples,
-          tags: [detectedCat],
-          notes: finalNotes,
-        })
+        .update(updatePayload)
         .eq("id", wordItem.id);
 
       if (error) throw error;
+
+      // Optimistic cache update so card renders instantly
+      qc.setQueryData<Word[]>(["words-all-raw"], (old) => {
+        if (!old) return [];
+        return old.map((w) =>
+          w.id === wordItem.id ? ({ ...w, ...updatePayload } as Word) : w
+        );
+      });
 
       await qc.invalidateQueries({ queryKey: ["words-all-raw"] });
       await qc.invalidateQueries({ queryKey: ["words"] });

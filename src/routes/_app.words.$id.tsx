@@ -125,6 +125,9 @@ function WordDetailPage() {
     try {
       toast.info(`Regenerating full details for "${w.word}" with AI…`);
       const r = await enrich({ data: { word: w.word } });
+      if (!r || (!r.one_word_ur && !r.translation_ur && !r.definition_en)) {
+        throw new Error("AI service did not return data for this word. Please try again.");
+      }
 
       const parsedCollocations = r.collocations || (Array.isArray(w.collocations) ? w.collocations : []);
       const detectedCat = r.category || (r.register === "formal" ? "news-reading" : r.register === "neutral" ? "workplace" : "daily-life");
@@ -144,26 +147,33 @@ function WordDetailPage() {
         ? [{ en: r.example_en || "", ur: r.example_ur || "" }]
         : (Array.isArray(w.examples) ? w.examples : []);
 
+      const updatePayload = {
+        part_of_speech: r.part_of_speech || w.part_of_speech,
+        one_word_en: r.one_word_en || w.one_word_en,
+        one_word_ur: r.one_word_ur || w.one_word_ur,
+        definition_en: r.definition_en || w.definition_en,
+        translation_ur: r.translation_ur || w.translation_ur,
+        synonym: r.synonym || w.synonym,
+        antonym: r.antonym || w.antonym,
+        example_en: r.example_en || w.example_en,
+        example_ur: r.example_ur || w.example_ur,
+        examples: updatedExamples,
+        collocations: parsedCollocations,
+        tags: [detectedCat],
+        notes: finalNotes,
+      };
+
       const { error } = await supabase
         .from("words")
-        .update({
-          part_of_speech: r.part_of_speech || w.part_of_speech,
-          one_word_en: r.one_word_en || w.one_word_en,
-          one_word_ur: r.one_word_ur || w.one_word_ur,
-          definition_en: r.definition_en || w.definition_en,
-          translation_ur: r.translation_ur || w.translation_ur,
-          synonym: r.synonym || w.synonym,
-          antonym: r.antonym || w.antonym,
-          example_en: r.example_en || w.example_en,
-          example_ur: r.example_ur || w.example_ur,
-          examples: updatedExamples,
-          collocations: parsedCollocations,
-          tags: [detectedCat],
-          notes: finalNotes,
-        })
+        .update(updatePayload)
         .eq("id", id);
 
       if (error) throw error;
+
+      qc.setQueryData(["word", id], (old: any) => (old ? { ...old, ...updatePayload } : old));
+      qc.setQueryData<any[]>(["words-all-raw"], (old) =>
+        old ? old.map((item) => (item.id === id ? { ...item, ...updatePayload } : item)) : []
+      );
 
       await qc.invalidateQueries({ queryKey: ["word", id] });
       await qc.invalidateQueries({ queryKey: ["words"] });
@@ -196,22 +206,33 @@ function WordDetailPage() {
         },
       });
 
+      if (!r || (!r.one_word_ur && !r.translation_ur)) {
+        throw new Error("AI could not generate Urdu translations. Please try again.");
+      }
+
       let updatedExamples = Array.isArray(w.examples) ? [...w.examples] : [];
       if (r.examples && r.examples.length > 0) {
         updatedExamples = r.examples;
       }
 
+      const updatePayload = {
+        one_word_ur: r.one_word_ur || w.one_word_ur,
+        translation_ur: r.translation_ur || w.translation_ur,
+        example_ur: updatedExamples[0]?.ur || w.example_ur,
+        examples: updatedExamples,
+      };
+
       const { error } = await supabase
         .from("words")
-        .update({
-          one_word_ur: r.one_word_ur || w.one_word_ur,
-          translation_ur: r.translation_ur || w.translation_ur,
-          example_ur: updatedExamples[0]?.ur || w.example_ur,
-          examples: updatedExamples,
-        })
+        .update(updatePayload)
         .eq("id", id);
 
       if (error) throw error;
+
+      qc.setQueryData(["word", id], (old: any) => (old ? { ...old, ...updatePayload } : old));
+      qc.setQueryData<any[]>(["words-all-raw"], (old) =>
+        old ? old.map((item) => (item.id === id ? { ...item, ...updatePayload } : item)) : []
+      );
 
       await qc.invalidateQueries({ queryKey: ["word", id] });
       await qc.invalidateQueries({ queryKey: ["words"] });

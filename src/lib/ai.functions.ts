@@ -66,58 +66,74 @@ No prose, no markdown fences, no extra keys.`;
 export const enrichWord = createServerFn({ method: "POST" })
   .validator((d: unknown) => Input.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url, model } = getAiConfig();
+    const { apiKey, url, model: defaultModel } = getAiConfig();
+    const isGeminiDirect = url.includes("generativelanguage.googleapis.com");
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM },
-          { role: "user", content: `Word: ${data.word}` },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-      }),
-    });
+    const fallbackModels = isGeminiDirect
+      ? [defaultModel, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+      : [defaultModel, "google/gemini-2.0-flash", "google/gemini-1.5-flash", "google/gemini-2.5-flash"];
 
-    if (!res.ok) {
-      const text = await res.text();
-      console.error(`AI gateway error ${res.status}: ${text.slice(0, 500)}`);
-      throw new Error("Failed to fetch word details. Please try again.");
+    const uniqueModels = Array.from(new Set(fallbackModels.filter(Boolean)));
+    let lastError: Error | null = null;
+
+    for (const model of uniqueModels) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM },
+              { role: "user", content: `Word: ${data.word}` },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+          }),
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          console.warn(`Model ${model} returned error ${res.status}: ${text.slice(0, 200)}`);
+          continue;
+        }
+
+        const j = await res.json();
+        const content = j.choices?.[0]?.message?.content ?? "{}";
+        const parsed = JSON.parse(content);
+        if (parsed && (parsed.one_word_ur || parsed.translation_ur || parsed.definition_en)) {
+          return parsed as {
+            category?: "daily-life" | "workplace" | "news-reading";
+            register?: "daily-life" | "workplace" | "news-reading" | "formal" | "neutral" | "informal";
+            informal?: string;
+            neutral?: string;
+            formal?: string;
+            formal_equivalent?: string;
+            neutral_equivalent?: string;
+            spoken_equivalent?: string;
+            part_of_speech?: string;
+            one_word_en?: string;
+            one_word_ur?: string;
+            synonym?: string;
+            antonym?: string;
+            definition_en?: string;
+            translation_ur?: string;
+            example_en?: string;
+            example_ur?: string;
+            tags?: string[];
+            collocations?: string[];
+            examples?: Array<{ en: string; ur?: string }>;
+          };
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
-    const j = await res.json();
-    const content = j.choices?.[0]?.message?.content ?? "{}";
-    try {
-      return JSON.parse(content) as {
-        category?: "daily-life" | "workplace" | "news-reading";
-        register?: "daily-life" | "workplace" | "news-reading" | "formal" | "neutral" | "informal";
-        informal?: string;
-        neutral?: string;
-        formal?: string;
-        formal_equivalent?: string;
-        neutral_equivalent?: string;
-        spoken_equivalent?: string;
-        part_of_speech?: string;
-        one_word_en?: string;
-        one_word_ur?: string;
-        synonym?: string;
-        antonym?: string;
-        definition_en?: string;
-        translation_ur?: string;
-        example_en?: string;
-        example_ur?: string;
-        tags?: string[];
-        collocations?: string[];
-        examples?: Array<{ en: string; ur?: string }>;
-      };
-    } catch {
-      return {};
-    }
+
+    throw lastError || new Error("Failed to fetch word details. Please try again.");
   });
 
 const UrduOnlyInput = z.object({
@@ -152,7 +168,8 @@ Return ONLY compact JSON:
 export const regenerateUrduOnly = createServerFn({ method: "POST" })
   .validator((d: unknown) => UrduOnlyInput.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url, model } = getAiConfig();
+    const { apiKey, url, model: defaultModel } = getAiConfig();
+    const isGeminiDirect = url.includes("generativelanguage.googleapis.com");
 
     let userPrompt = `Word: "${data.word}"`;
     if (data.definition_en) {
@@ -162,40 +179,54 @@ export const regenerateUrduOnly = createServerFn({ method: "POST" })
       userPrompt += `\nExample Sentences to translate:\n${data.examples_en.map((ex, i) => `${i + 1}. ${ex}`).join("\n")}`;
     }
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: URDU_ONLY_SYSTEM },
-          { role: "user", content: userPrompt },
-        ],
-        response_format: { type: "json_object" },
-        temperature: 0.3,
-      }),
-    });
+    const fallbackModels = isGeminiDirect
+      ? [defaultModel, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-2.5-flash"]
+      : [defaultModel, "google/gemini-2.0-flash", "google/gemini-1.5-flash", "google/gemini-2.5-flash"];
 
-    if (!res.ok) {
-      const err = await res.text();
-      console.error(`AI regenerateUrduOnly error ${res.status}: ${err.slice(0, 300)}`);
-      throw new Error("Failed to generate Urdu translation. Please try again.");
+    const uniqueModels = Array.from(new Set(fallbackModels.filter(Boolean)));
+    let lastError: Error | null = null;
+
+    for (const model of uniqueModels) {
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: URDU_ONLY_SYSTEM },
+              { role: "user", content: userPrompt },
+            ],
+            response_format: { type: "json_object" },
+            temperature: 0.3,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          console.warn(`Model ${model} returned error in regenerateUrduOnly: ${err.slice(0, 200)}`);
+          continue;
+        }
+
+        const j = await res.json();
+        const content = j.choices?.[0]?.message?.content ?? "{}";
+        const parsed = JSON.parse(content);
+        if (parsed && (parsed.one_word_ur || parsed.translation_ur)) {
+          return parsed as {
+            one_word_ur?: string;
+            translation_ur?: string;
+            examples?: Array<{ en: string; ur: string }>;
+          };
+        }
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+      }
     }
 
-    const j = await res.json();
-    const content = j.choices?.[0]?.message?.content ?? "{}";
-    try {
-      return JSON.parse(content) as {
-        one_word_ur?: string;
-        translation_ur?: string;
-        examples?: Array<{ en: string; ur: string }>;
-      };
-    } catch {
-      return {};
-    }
+    throw lastError || new Error("Failed to generate Urdu translation. Please try again.");
   });
 
 const FormalityBatchInput = z.object({
