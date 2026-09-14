@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { enrichWord } from "@/lib/ai.functions";
+import { enrichWord, regenerateUrduOnly } from "@/lib/ai.functions";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Wand2, ArrowLeft, Save, Plus, Trash2, Tag, BookMarked } from "lucide-react";
+import { Wand2, ArrowLeft, Save, Plus, Trash2, Tag, BookMarked, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -103,6 +103,40 @@ function AddWordPage() {
     setExamples((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const regenUrdu = useServerFn(regenerateUrduOnly);
+  const [translatingIdx, setTranslatingIdx] = useState<number | null>(null);
+
+  const handleTranslateExample = async (idx: number) => {
+    const target = examples[idx];
+    if (!target || !target.en.trim()) {
+      toast.error("Enter an English example first");
+      return;
+    }
+    setTranslatingIdx(idx);
+    try {
+      toast.info("Translating example sentence to Urdu…");
+      const r = await regenUrdu({
+        data: {
+          word: form.word.trim() || target.en.trim(),
+          definition_en: form.definition_en.trim() || undefined,
+          examples_en: [target.en.trim()],
+        },
+      });
+
+      const translatedUr = r.examples?.[0]?.ur || r.translation_ur || r.one_word_ur || "";
+      if (translatedUr) {
+        updateExample(idx, "ur", translatedUr);
+        toast.success("Urdu translation generated!");
+      } else {
+        toast.error("Could not translate sentence");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Translation failed");
+    } finally {
+      setTranslatingIdx(null);
+    }
+  };
+
   const handleEnrich = async () => {
     if (!form.word.trim()) {
       toast.error("Enter a word first");
@@ -122,15 +156,42 @@ function AddWordPage() {
           ? r.collocations.join(", ")
           : "";
 
-      if (r.examples && r.examples.length > 0) {
-        setExamples(
-          r.examples.map((ex: { en: string; ur?: string }) => ({
-            en: ex.en || "",
-            ur: ex.ur || "",
-          }))
-        );
-      } else if (r.example_en || r.example_ur) {
-        setExamples([{ en: r.example_en || "", ur: r.example_ur || "" }]);
+      // Robust extraction of example sentences with Urdu translations
+      let parsedExamples: Array<{ en: string; ur: string }> = [];
+      if (r.examples && Array.isArray(r.examples) && r.examples.length > 0) {
+        parsedExamples = r.examples
+          .map((ex: any) => {
+            if (typeof ex === "string") return { en: ex.trim(), ur: "" };
+            const en =
+              ex.en ||
+              ex.english ||
+              ex.sentence ||
+              ex.sentence_en ||
+              ex.example ||
+              ex.example_en ||
+              "";
+            const ur =
+              ex.ur ||
+              ex.urdu ||
+              ex.translation ||
+              ex.translation_ur ||
+              ex.sentence_ur ||
+              ex.example_ur ||
+              ex.meaning ||
+              "";
+            return { en: String(en).trim(), ur: String(ur).trim() };
+          })
+          .filter((ex) => ex.en || ex.ur);
+      }
+
+      if (parsedExamples.length === 0 && (r.example_en || r.example_ur)) {
+        parsedExamples = [{ en: (r.example_en || "").trim(), ur: (r.example_ur || "").trim() }];
+      } else if (parsedExamples.length > 0 && r.example_ur && !parsedExamples[0].ur) {
+        parsedExamples[0].ur = r.example_ur.trim();
+      }
+
+      if (parsedExamples.length > 0) {
+        setExamples(parsedExamples);
       } else {
         setExamples([{ en: "", ur: "" }]);
       }
@@ -157,7 +218,7 @@ function AddWordPage() {
         translation_ur: r.translation_ur || "",
         collocationsInput: generatedCollocations,
       }));
-      toast.success("Fresh AI answers populated");
+      toast.success("Fresh AI answers & Urdu examples populated!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "AI fill failed");
     } finally {
@@ -543,14 +604,32 @@ function AddWordPage() {
                       </button>
                     )}
                   </div>
-                  <Textarea
-                    rows={2}
-                    placeholder="آسان اور عام فہم اردو ترجمہ..."
-                    value={ex.ur}
-                    onChange={(e) => updateExample(idx, "ur", e.target.value)}
-                    className="bg-background font-urdu text-sm sm:text-base leading-[1.8] resize-y min-h-[64px]"
-                    dir="rtl"
-                  />
+                  <div className="flex items-start gap-2">
+                    <Textarea
+                      rows={2}
+                      placeholder="آسان اور عام فہم اردو ترجمہ..."
+                      value={ex.ur}
+                      onChange={(e) => updateExample(idx, "ur", e.target.value)}
+                      className="bg-background font-urdu text-sm sm:text-base leading-[1.8] flex-1 resize-y min-h-[64px]"
+                      dir="rtl"
+                    />
+                    {ex.en.trim() && (
+                      <button
+                        type="button"
+                        disabled={translatingIdx === idx}
+                        onClick={() => handleTranslateExample(idx)}
+                        className="text-primary hover:text-primary/80 hover:bg-primary/10 p-1.5 rounded-md transition-colors cursor-pointer shrink-0 mt-1 border border-primary/30"
+                        title="Translate sentence with AI"
+                        aria-label="Translate sentence with AI"
+                      >
+                        {translatingIdx === idx ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -58,10 +58,64 @@ Given an English word, return ONLY compact JSON with these keys:
 - tags: array of 1 to 2 permanent situation tags (e.g. ["daily-life"] or ["workplace"] or ["news-reading"]).
 - collocations: array of 2 to 3 natural spoken collocations/phrases commonly used in daily conversation.
 - example_en: primary daily-life or workplace conversation sentence (max 18 words). Wrap the headword in quotes.
-- example_ur: the primary example translated into SHORT, VERY SIMPLE, natural spoken Urdu.
-- examples: array of 2 to 3 distinct practical conversational example sentences with VERY SIMPLE spoken Urdu translations.
+- example_ur: the primary example translated into SHORT, VERY SIMPLE, natural spoken Urdu in Urdu script.
+- examples: array of 2 to 3 objects where EVERY single object MUST have BOTH "en" (English sentence) AND "ur" (simple spoken Urdu translation in Urdu script):
+  [
+    {"en": "She gave a clear explanation.", "ur": "اس نے صاف اور واضح بات سمجھائی۔"},
+    {"en": "Keep the message brief and clear.", "ur": "پیغام کو مختصر اور واضح رکھیں۔"}
+  ]
 
 No prose, no markdown fences, no extra keys.`;
+
+export function normalizeExampleList(
+  rawExamples: any,
+  primaryEn?: string,
+  primaryUr?: string
+): Array<{ en: string; ur: string }> {
+  const result: Array<{ en: string; ur: string }> = [];
+
+  if (Array.isArray(rawExamples)) {
+    for (const item of rawExamples) {
+      if (!item) continue;
+      if (typeof item === "string") {
+        if (item.trim()) {
+          result.push({ en: item.trim(), ur: "" });
+        }
+      } else if (typeof item === "object") {
+        const en =
+          item.en ||
+          item.english ||
+          item.sentence ||
+          item.sentence_en ||
+          item.example ||
+          item.example_en ||
+          item.text ||
+          "";
+        const ur =
+          item.ur ||
+          item.urdu ||
+          item.translation ||
+          item.translation_ur ||
+          item.sentence_ur ||
+          item.example_ur ||
+          item.meaning ||
+          "";
+        if (en || ur) {
+          result.push({ en: String(en).trim(), ur: String(ur).trim() });
+        }
+      }
+    }
+  }
+
+  // If primary example pair was provided and not in result, add or attach
+  if (result.length === 0 && (primaryEn || primaryUr)) {
+    result.push({ en: (primaryEn || "").trim(), ur: (primaryUr || "").trim() });
+  } else if (result.length > 0 && primaryUr && !result[0].ur) {
+    result[0].ur = primaryUr.trim();
+  }
+
+  return result;
+}
 
 export const enrichWord = createServerFn({ method: "POST" })
   .validator((d: unknown) => Input.parse(d))
@@ -105,7 +159,18 @@ export const enrichWord = createServerFn({ method: "POST" })
         const content = j.choices?.[0]?.message?.content ?? "{}";
         const parsed = JSON.parse(content);
         if (parsed && (parsed.one_word_ur || parsed.translation_ur || parsed.definition_en)) {
-          return parsed as {
+          const normalizedExamples = normalizeExampleList(
+            parsed.examples,
+            parsed.example_en,
+            parsed.example_ur
+          );
+
+          return {
+            ...parsed,
+            example_en: parsed.example_en || normalizedExamples[0]?.en || "",
+            example_ur: parsed.example_ur || normalizedExamples[0]?.ur || "",
+            examples: normalizedExamples,
+          } as {
             category?: "daily-life" | "workplace" | "news-reading";
             register?: "daily-life" | "workplace" | "news-reading" | "formal" | "neutral" | "informal";
             informal?: string;
@@ -215,7 +280,16 @@ export const regenerateUrduOnly = createServerFn({ method: "POST" })
         const content = j.choices?.[0]?.message?.content ?? "{}";
         const parsed = JSON.parse(content);
         if (parsed && (parsed.one_word_ur || parsed.translation_ur)) {
-          return parsed as {
+          const normalizedExamples = normalizeExampleList(
+            parsed.examples,
+            parsed.example_en,
+            parsed.example_ur
+          );
+
+          return {
+            ...parsed,
+            examples: normalizedExamples,
+          } as {
             one_word_ur?: string;
             translation_ur?: string;
             examples?: Array<{ en: string; ur: string }>;
