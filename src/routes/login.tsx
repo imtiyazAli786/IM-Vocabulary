@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { BookOpenCheck, UserIcon } from "lucide-react";
+import { UserIcon } from "lucide-react";
 
 const GUEST_KEY = "lafz_guest_id";
 
