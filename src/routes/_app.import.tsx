@@ -89,8 +89,8 @@ function ImportPage() {
         }
 
         const result = await parseDoc({ data: { text } });
-        const parsed: ParsedEntry[] = result.entries
-          .filter((e): e is typeof e & { word: string } => !!e.word?.trim())
+        const parsed: ParsedEntry[] = (result.entries as any[])
+          .filter((e: any): e is typeof e & { word: string } => !!e.word?.trim())
           .map((e: any) => ({
             word: e.word!.trim(),
             type: e.type as ParsedEntry["type"] | undefined,
@@ -177,6 +177,7 @@ function ImportPage() {
     setEntries((prev) => prev.map((e) => ({ ...e, selected: checked })));
   };
 
+  const selectedCount = entries.filter((e) => e.selected).length;
   const missingUrduCount = entries.filter((e) => !e.one_word_ur && !e.translation_ur).length;
 
   const handleEnrichSingleEntry = async (index: number) => {

@@ -51,8 +51,8 @@ export const supabase = {
       return (getReal().realtime as any)[prop];
     },
   }),
-  channel: (...args: any[]) => getReal().channel(...args),
-  removeChannel: (...args: any[]) => getReal().removeChannel(...args),
+  channel: (name: string, opts?: any) => getReal().channel(name, opts),
+  removeChannel: (channel: any) => getReal().removeChannel(channel),
   removeAllChannels: () => getReal().removeAllChannels(),
   getChannels: () => getReal().getChannels(),
 } as unknown as ReturnType<typeof createClient<Database>>;

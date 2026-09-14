@@ -119,7 +119,7 @@ function SentencesPage() {
   }, [searchQ, filterMode, selectedCategory]);
 
   // Fetch words and sentences
-  const { data: words, isLoading } = useQuery({
+  const { data: words = [], isLoading } = useQuery<any[]>({
     queryKey: ["words-sentences"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -127,10 +127,9 @@ function SentencesPage() {
         .select("id,word,type,tags,notes,example_en,example_ur,examples")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as any[];
     },
     staleTime: 5 * 60_000,
-    placeholderData: (prev) => prev,
   });
 
   // Extract all sentences cleanly
@@ -280,12 +279,12 @@ function SentencesPage() {
           const parts = sentenceId.split("-ex-");
           const exIdx = parseInt(parts[1], 10);
           if (!isNaN(exIdx) && updatedExamples[exIdx]) {
-            updatedExamples[exIdx] = { ...updatedExamples[exIdx], ur: newUr };
+            updatedExamples[exIdx] = { ...(updatedExamples[exIdx] as Record<string, any>), ur: newUr };
           }
         } else {
           updatedExampleUr = newUr;
           if (updatedExamples.length > 0) {
-            updatedExamples[0] = { ...updatedExamples[0], ur: newUr };
+            updatedExamples[0] = { ...(updatedExamples[0] as Record<string, any>), ur: newUr };
           }
         }
 

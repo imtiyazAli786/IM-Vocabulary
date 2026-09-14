@@ -25,6 +25,9 @@ import {
   extractFormalitySpectrum,
 } from "@/lib/formality";
 import { FormalitySpectrum } from "@/components/FormalitySpectrum";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Word = Tables<"words">;
 
 export const Route = createFileRoute("/_app/review")({
   component: ReviewPage,
@@ -86,7 +89,7 @@ function ReviewPage() {
   }, []);
 
   // Fetch words based on deck type
-  const { data: rawWords, isLoading } = useQuery({
+  const { data: rawWords = [], isLoading } = useQuery<Word[]>({
     queryKey: ["review-words", deckType],
     queryFn: async () => {
       let query = supabase.from("words").select("*");
@@ -100,10 +103,9 @@ function ReviewPage() {
         .limit(300);
 
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as Word[];
     },
     staleTime: 5 * 60_000,
-    placeholderData: (prev) => prev,
   });
 
   // Calculate situation category counts
@@ -184,7 +186,7 @@ function ReviewPage() {
   const currentSentences = useMemo<ExampleItem[]>(() => {
     if (!current) return [];
     if (Array.isArray(current.examples) && current.examples.length > 0) {
-      return current.examples as ExampleItem[];
+      return current.examples as unknown as ExampleItem[];
     }
     if (current.example_en || current.example_ur) {
       return [{ en: current.example_en || "", ur: current.example_ur || "" }];

@@ -112,7 +112,7 @@ function AddWordPage() {
     try {
       const r = await enrich({ data: { word: form.word.trim() } });
 
-      let inferredType = (r.type as any) || form.type || "word";
+      let inferredType = (r as any).type || form.type || "word";
       if (form.type === "word" && form.word.trim().split(/\s+/).length > 1) {
         inferredType = "phrase";
       }
@@ -214,7 +214,7 @@ function AddWordPage() {
         translation_ur: form.translation_ur.trim() || null,
         example_en: primaryExample.en.trim() || null,
         example_ur: primaryExample.ur.trim() || null,
-        examples: validExamples,
+        examples: validExamples as any,
         tags: [form.category],
         collocations: parsedCollocations,
         notes: finalNotes || null,

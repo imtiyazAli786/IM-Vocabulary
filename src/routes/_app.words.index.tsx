@@ -26,9 +26,14 @@ import { speak } from "@/lib/speech";
 import {
   FormalityRegister,
   REGISTER_CONFIG,
+  CATEGORY_CONFIG,
   extractFormalitySpectrum,
+  PermanentCategory,
   cleanUserNotes,
 } from "@/lib/formality";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Word = Tables<"words">;
 
 const searchSchema = z.object({
   page: z.number().int().min(1).catch(1),
@@ -72,7 +77,7 @@ function WordsPage() {
     return () => clearTimeout(timer);
   }, [searchInput, register, q, navigate]);
 
-  const { data: allRawWords, isLoading } = useQuery({
+  const { data: allRawWords = [], isLoading } = useQuery<Word[]>({
     queryKey: ["words-all-raw"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -80,10 +85,9 @@ function WordsPage() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as unknown as Word[];
     },
     staleTime: 5 * 60_000,
-    placeholderData: (prev) => prev,
   });
 
   // Calculate situation category counts

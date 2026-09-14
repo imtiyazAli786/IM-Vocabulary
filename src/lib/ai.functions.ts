@@ -358,7 +358,8 @@ const TestInput = z.object({
 export const testAiKey = createServerFn({ method: "POST" })
   .validator((d: unknown) => TestInput.parse(d))
   .handler(async ({ data }) => {
-    const { apiKey, url, model, provider } = getAiConfig(data.key, data.provider, data.model);
+    const { apiKey, url, model } = getAiConfig();
+    const provider = data.provider;
 
     const start = Date.now();
     const headers: Record<string, string> = {
