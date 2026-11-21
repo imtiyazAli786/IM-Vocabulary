@@ -32,6 +32,10 @@ yarn-error.*
 
 # local env files
 .env*.local
+.env
+
+# Firebase
+.firebase/
 
 # typescript
 *.tsbuildinfo
@@ -39,3 +43,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# build outputs
+build-apks/
+*.apk
