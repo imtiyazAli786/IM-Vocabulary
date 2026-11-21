@@ -466,8 +466,8 @@ const createStyles = (colors: ThemeColors) =>
       alignItems: 'center',
       position: 'relative',
       paddingHorizontal: Spacing.xl,
-      paddingVertical: Spacing.md,
-      minHeight: 48,
+      paddingVertical: Spacing.sm,
+      minHeight: 44,
     },
     counterBox: {
       backgroundColor: colors.surfaceElevated,

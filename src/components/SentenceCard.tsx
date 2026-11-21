@@ -254,8 +254,8 @@ export function SentenceCard({
 const createStyles = (colors: ThemeColors, shadows: ThemeShadows) =>
   StyleSheet.create({
     cardContainer: {
-      width: Math.min(SCREEN_WIDTH - 36, 420),
-      height: Math.min(SCREEN_HEIGHT * 0.58, 480),
+      width: Math.min(SCREEN_WIDTH - 28, 440),
+      height: Math.min(SCREEN_HEIGHT * 0.65, 540),
       alignSelf: 'center',
       position: 'relative',
     },
